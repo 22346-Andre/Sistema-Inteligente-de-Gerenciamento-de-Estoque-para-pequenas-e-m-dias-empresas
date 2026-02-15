@@ -1,4 +1,4 @@
-package com.smartstock.backend.controller;
+package  com.smartstock.backend.conttroler;
 
 import com.smartstock.backend.dto.MovimentacaoDTO;
 import com.smartstock.backend.model.Movimentacao;
