@@ -29,12 +29,12 @@ public class Usuario implements UserDetails {
 
     private String perfil;
 
-    // 👇 ESTE MÉTODO É O SEGREDO PARA NÃO USAR O AUTHENTICATION MANAGER
+
     public boolean isLoginCorrect(LoginRequest loginRequest, PasswordEncoder passwordEncoder) {
         return passwordEncoder.matches(loginRequest.senha(), this.senha);
     }
 
-    // --- UserDetails (Não mexer) ---
+    // --- UserDetails  ---
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         if (this.perfil != null && this.perfil.equals("ADMIN")) {

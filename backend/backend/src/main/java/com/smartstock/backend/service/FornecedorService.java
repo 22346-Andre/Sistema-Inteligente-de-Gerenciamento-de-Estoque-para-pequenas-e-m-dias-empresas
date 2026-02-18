@@ -19,13 +19,13 @@ public class FornecedorService {
     }
 
     public Fornecedor salvar(FornecedorDTO dto) {
-        // CORREÇÃO AQUI: dto.getCnpj() em vez de dto.cnpj()
+        // dto.getCnpj() em vez de dto.cnpj()
         if (repository.findByCnpj(dto.getCnpj()).isPresent()) {
             throw new RuntimeException("Fornecedor com este CNPJ já existe!");
         }
 
         Fornecedor fornecedor = new Fornecedor();
-        // CORREÇÃO AQUI: Usando os Getters do Lombok
+        // Usando os Getters do Lombok
         fornecedor.setNome(dto.getNome());
         fornecedor.setCnpj(dto.getCnpj());
         fornecedor.setTelefone(dto.getTelefone());
@@ -39,7 +39,7 @@ public class FornecedorService {
         Fornecedor fornecedor = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado"));
 
-        // CORREÇÃO AQUI TAMBÉM:
+
         fornecedor.setNome(dto.getNome());
         fornecedor.setTelefone(dto.getTelefone());
         fornecedor.setEmail(dto.getEmail());

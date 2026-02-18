@@ -25,7 +25,7 @@ public class AuthController {
     private JwtEncoder jwtEncoder;
 
     @Autowired
-    private UsuarioRepository userRepository; // <--- Usamos isto em vez do Manager
+    private UsuarioRepository userRepository;
 
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
@@ -36,7 +36,7 @@ public class AuthController {
         // 1. Buscamos o usuário no banco
         var user = userRepository.findByEmail(loginRequest.email());
 
-        // 2. Verificamos a senha manualmente (SEM LOOP INFINITO)
+        // 2. Verificar a senha manualmente
         if (user.isEmpty() || !user.get().isLoginCorrect(loginRequest, passwordEncoder)) {
             throw new BadCredentialsException("Usuário ou senha inválidos!");
         }
