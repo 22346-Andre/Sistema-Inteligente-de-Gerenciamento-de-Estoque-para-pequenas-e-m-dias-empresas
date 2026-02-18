@@ -1,4 +1,4 @@
-package  com.smartstock.backend.conttroler;
+package com.smartstock.backend.conttroler;
 
 import com.smartstock.backend.dto.UsuarioDTO;
 import com.smartstock.backend.model.Usuario;
@@ -34,6 +34,9 @@ public class UsuarioController {
     // POST - Criar novo
     @PostMapping
     public ResponseEntity<Usuario> criar(@RequestBody @Valid UsuarioDTO dto) {
+
+        System.out.println("🚀 SUCESSO: A requisição chegou no Controller de Criação!");
+
         return ResponseEntity.ok(service.salvar(dto));
     }
 

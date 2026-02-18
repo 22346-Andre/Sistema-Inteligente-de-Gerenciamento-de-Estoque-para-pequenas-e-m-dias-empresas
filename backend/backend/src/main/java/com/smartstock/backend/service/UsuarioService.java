@@ -4,6 +4,7 @@ import com.smartstock.backend.dto.UsuarioDTO;
 import com.smartstock.backend.model.Usuario;
 import com.smartstock.backend.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder; // <--- IMPORTANTE
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -15,6 +16,9 @@ public class UsuarioService {
     @Autowired
     private UsuarioRepository repository;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder; // <--- A PEÇA QUE FALTAVA
+
     // 1. LISTAR TODOS
     public List<Usuario> listarTodos() {
         return repository.findAll();
@@ -25,7 +29,7 @@ public class UsuarioService {
         return repository.findById(id);
     }
 
-    // 3. SALVAR (CREATE)
+    // 3. SALVAR (CREATE) - AGORA COM CRIPTOGRAFIA
     public Usuario salvar(UsuarioDTO dto) {
         if (repository.findByEmail(dto.getEmail()).isPresent()) {
             throw new RuntimeException("Este e-mail já está cadastrado!");
@@ -34,7 +38,10 @@ public class UsuarioService {
         Usuario usuario = new Usuario();
         usuario.setNome(dto.getNome());
         usuario.setEmail(dto.getEmail());
-        usuario.setSenha(dto.getSenha()); // Futuramente vamos criptografar
+
+
+        usuario.setSenha(passwordEncoder.encode(dto.getSenha()));
+
         usuario.setPerfil(dto.getPerfil() != null ? dto.getPerfil() : "FUNCIONARIO");
 
         return repository.save(usuario);
@@ -48,7 +55,8 @@ public class UsuarioService {
         usuario.setNome(dto.getNome());
         usuario.setEmail(dto.getEmail());
         usuario.setPerfil(dto.getPerfil());
-        // Nota: Não atualizamos a senha aqui por segurança, teria que ter uma rota só pra isso.
+
+
 
         return repository.save(usuario);
     }
