@@ -8,8 +8,7 @@ import com.smartstock.backend.repository.MovimentacaoRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional; // Importante para garantir segurança nos dados
-
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service

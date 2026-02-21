@@ -19,7 +19,7 @@ public class VerificadorEstoqueService {
     }
 
     // Roda a cada 60 segundos
-    @Scheduled(fixedRate = 60000)
+    @Scheduled(fixedRate = 7200000)
     public void verificarNiveisDeEstoque() {
         System.out.println("🔎 Iniciando verificação automática de estoque...");
 
