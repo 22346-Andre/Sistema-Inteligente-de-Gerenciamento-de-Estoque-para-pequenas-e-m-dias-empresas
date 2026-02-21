@@ -19,7 +19,7 @@ public class FornecedorService {
     }
 
     public Fornecedor salvar(FornecedorDTO dto) {
-        // dto.getCnpj() em vez de dto.cnpj()
+        // dto.getCnpj()
         if (repository.findByCnpj(dto.getCnpj()).isPresent()) {
             throw new RuntimeException("Fornecedor com este CNPJ já existe!");
         }

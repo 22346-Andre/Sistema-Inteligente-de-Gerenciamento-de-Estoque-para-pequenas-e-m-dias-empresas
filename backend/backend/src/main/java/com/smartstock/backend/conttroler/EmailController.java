@@ -21,7 +21,7 @@ public class EmailController {
         emailService.sendEmail(
                 "andrelucasreis2004t@gmail.com",
                 "Email de Teste",
-                "Funcionou! Email enviado pelo Spring Boot 🚀"
+                " Pronto, deu certo "
         );
 
         return "email sent succesfully";

@@ -40,8 +40,8 @@ public class SecurityConfigurations {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll() // Libera Login
-                        .requestMatchers(HttpMethod.POST, "/api/usuarios").permitAll()   // Libera Cadastro
+                        .requestMatchers(HttpMethod.POST, "/auth/login").permitAll() // Libera Login
+                        .requestMatchers(HttpMethod.POST, "/usuarios").permitAll()   // Libera Cadastro
                         .requestMatchers(HttpMethod.POST, "/email/send").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll() // Swagger
                         .anyRequest().authenticated())

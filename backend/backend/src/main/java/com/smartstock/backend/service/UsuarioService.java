@@ -4,7 +4,7 @@ import com.smartstock.backend.dto.UsuarioDTO;
 import com.smartstock.backend.model.Usuario;
 import com.smartstock.backend.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.password.PasswordEncoder; // <--- IMPORTANTE
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
