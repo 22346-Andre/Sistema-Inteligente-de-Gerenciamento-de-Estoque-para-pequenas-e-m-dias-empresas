@@ -23,4 +23,9 @@ public class ProdutoDTO {
     private Integer quantidade;
 
     private Integer estoqueMinimo;
+
+    private String ncm;
+    private String unidade;
+
+
 }

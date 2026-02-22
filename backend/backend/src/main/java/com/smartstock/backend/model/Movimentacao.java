@@ -25,4 +25,8 @@ public class Movimentacao {
     private Integer quantidade;
 
     private LocalDateTime dataMovimentacao = LocalDateTime.now();
+
+    @ManyToOne
+    @JoinColumn(name = "empresa_id")
+    private Empresa empresa;
 }

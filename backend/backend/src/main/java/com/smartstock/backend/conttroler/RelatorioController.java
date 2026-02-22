@@ -21,17 +21,16 @@ public class RelatorioController {
 
     @GetMapping("/balanco/pdf")
     public ResponseEntity<byte[]> descarregarBalancoPdf() {
-
-        // Manda gerar o ficheiro
+        // o método não precisa receber o nome, ele usa o JWT do usuário logado!
         byte[] pdfBytes = relatorioPdfService.gerarBalancoGeralPdf();
 
-        // Configura o cabeçalho para forçar o navegador a fazer o download do PDF
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
         headers.setContentDispositionFormData("attachment", "balanco_estoque_smartstock.pdf");
 
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
+
     @GetMapping("/movimentacoes/pdf")
     public ResponseEntity<byte[]> descarregarMovimentacoesPdf() {
         byte[] pdfBytes = relatorioPdfService.gerarRelatorioMovimentacoesPdf();
@@ -39,6 +38,17 @@ public class RelatorioController {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
         headers.setContentDispositionFormData("attachment", "historico_movimentacoes_smartstock.pdf");
+
+        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+    }
+
+    @GetMapping("/inventario/pdf")
+    public ResponseEntity<byte[]> descarregarInventarioPdf() {
+        byte[] pdfBytes = relatorioPdfService.gerarRelatorioInventarioFiscalPdf();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "inventario_fiscal_smartstock.pdf");
 
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }

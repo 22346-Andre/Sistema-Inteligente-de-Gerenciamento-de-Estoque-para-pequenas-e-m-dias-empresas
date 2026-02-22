@@ -30,6 +30,10 @@ public class Usuario implements UserDetails {
     private String perfil;
 
 
+    @ManyToOne
+    @JoinColumn(name = "empresa_id")
+    private Empresa empresa;
+
     public boolean isLoginCorrect(LoginRequest loginRequest, PasswordEncoder passwordEncoder) {
         return passwordEncoder.matches(loginRequest.senha(), this.senha);
     }

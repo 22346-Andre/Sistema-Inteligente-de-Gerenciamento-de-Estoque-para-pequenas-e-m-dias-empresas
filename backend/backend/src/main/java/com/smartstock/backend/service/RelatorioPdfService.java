@@ -4,14 +4,19 @@ import com.lowagie.text.*;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
+import com.smartstock.backend.model.Empresa;
 import com.smartstock.backend.model.Movimentacao;
 import com.smartstock.backend.model.Produto;
+import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.MovimentacaoRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -21,17 +26,34 @@ public class RelatorioPdfService {
 
     private final ProdutoRepository produtoRepository;
     private final MovimentacaoRepository movimentacaoRepository;
+    private final EmpresaRepository empresaRepository; // NOVO: Para buscar o nome real da empresa
 
-    public RelatorioPdfService(ProdutoRepository produtoRepository, MovimentacaoRepository movimentacaoRepository) {
+    public RelatorioPdfService(ProdutoRepository produtoRepository, MovimentacaoRepository movimentacaoRepository, EmpresaRepository empresaRepository) {
         this.produtoRepository = produtoRepository;
         this.movimentacaoRepository = movimentacaoRepository;
+        this.empresaRepository = empresaRepository;
+    }
+
+    // --- MÉTODO AUXILIAR DA CONFIANÇA ZERO (JWT) ---
+    private Empresa getEmpresaLogada() {
+        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Long empresaId = jwt.getClaim("empresaId");
+
+        if (empresaId == null) {
+            throw new RuntimeException("Erro: O usuário logado não possui vínculo com nenhuma empresa.");
+        }
+        return empresaRepository.findById(empresaId)
+                .orElseThrow(() -> new RuntimeException("Empresa não encontrada no banco de dados."));
     }
 
     // ==========================================
     // MÉTODO 1: BALANÇO GERAL DE ESTOQUE
     // ==========================================
     public byte[] gerarBalancoGeralPdf() {
-        List<Produto> todosProdutos = produtoRepository.findAll();
+        Empresa empresa = getEmpresaLogada();
+        //  Traz apenas os produtos desta empresa!
+        List<Produto> produtosDaEmpresa = produtoRepository.findByEmpresaId(empresa.getId());
+
         Document document = new Document(PageSize.A4);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
 
@@ -40,7 +62,7 @@ public class RelatorioPdfService {
             document.open();
 
             Font fontTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
-            Paragraph titulo = new Paragraph("Balanco Geral de Estoque - SmartStock", fontTitulo);
+            Paragraph titulo = new Paragraph("Balanco Geral de Estoque - " + empresa.getNomeFantasia().toUpperCase(), fontTitulo);
             titulo.setAlignment(Element.ALIGN_CENTER);
             document.add(titulo);
 
@@ -65,7 +87,7 @@ public class RelatorioPdfService {
             h4.setBackgroundColor(Color.LIGHT_GRAY);
             table.addCell(h1); table.addCell(h2); table.addCell(h3); table.addCell(h4);
 
-            for (Produto p : todosProdutos) {
+            for (Produto p : produtosDaEmpresa) {
                 table.addCell(p.getNome());
                 table.addCell(p.getPreco() != null ? p.getPreco().toString() : "0.00");
 
@@ -90,7 +112,10 @@ public class RelatorioPdfService {
     // MÉTODO 2: HISTÓRICO DE MOVIMENTAÇÕES
     // ==========================================
     public byte[] gerarRelatorioMovimentacoesPdf() {
-        List<Movimentacao> movimentacoes = movimentacaoRepository.findAllByOrderByDataMovimentacaoDesc();
+        Empresa empresa = getEmpresaLogada();
+        // Traz apenas as movimentações desta empresa!
+        List<Movimentacao> movimentacoes = movimentacaoRepository.findByEmpresaIdOrderByDataMovimentacaoDesc(empresa.getId());
+
         Document document = new Document(PageSize.A4);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
 
@@ -99,7 +124,7 @@ public class RelatorioPdfService {
             document.open();
 
             Font fontTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
-            Paragraph titulo = new Paragraph("Relatorio de Movimentacoes (Entradas e Saidas)", fontTitulo);
+            Paragraph titulo = new Paragraph("Relatorio de Movimentacoes - " + empresa.getNomeFantasia().toUpperCase(), fontTitulo);
             titulo.setAlignment(Element.ALIGN_CENTER);
             document.add(titulo);
 
@@ -146,6 +171,95 @@ public class RelatorioPdfService {
         } catch (DocumentException e) {
             e.printStackTrace();
         }
+        return out.toByteArray();
+    }
+
+    // ==========================================
+    // MÉTODO 3: RELATÓRIO DE INVENTÁRIO (MODELO FISCAL)
+    // ==========================================
+    public byte[] gerarRelatorioInventarioFiscalPdf() {
+        Empresa empresa = getEmpresaLogada();
+        //  Traz apenas os produtos desta empresa!
+        List<Produto> produtosDaEmpresa = produtoRepository.findByEmpresaId(empresa.getId());
+
+        Document document = new Document(PageSize.A4.rotate());
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        try {
+            PdfWriter.getInstance(document, out);
+            document.open();
+
+            Font fontCabecalho = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9);
+            Font fontCelulas = FontFactory.getFont(FontFactory.HELVETICA, 9);
+
+            PdfPTable table = new PdfPTable(7);
+            table.setWidthPercentage(100);
+            table.setWidths(new float[]{1.8f, 3.5f, 1.2f, 1f, 1.5f, 1.5f, 2f});
+
+            PdfPCell cell1 = new PdfPCell(new Phrase("ESTOQUES EXISTENTES EM\n" + empresa.getNomeFantasia().toUpperCase(), fontCabecalho));
+            cell1.setColspan(2);
+            cell1.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cell1.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            table.addCell(cell1);
+
+            PdfPCell cell2 = new PdfPCell(new Phrase("DE ....................................................", fontCabecalho));
+            cell2.setColspan(2);
+            cell2.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cell2.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            table.addCell(cell2);
+
+            String ano = String.valueOf(LocalDateTime.now().getYear());
+            PdfPCell cell3 = new PdfPCell(new Phrase("DE " + ano, fontCabecalho));
+            cell3.setColspan(3);
+            cell3.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cell3.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            table.addCell(cell3);
+
+            String[] colunas = {"CLASSIFICAÇÃO\nFISCAL (NCM)", "DESCRIÇÃO", "QUANTIDADE", "UNIDADE", "PREÇO MÉDIO\nUNITÁRIO EM R$", "VALOR TOTAL\nEM R$", "OBSERVAÇÕES"};
+            for (String col : colunas) {
+                PdfPCell cell = new PdfPCell(new Phrase(col, fontCabecalho));
+                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+                table.addCell(cell);
+            }
+
+            for (Produto p : produtosDaEmpresa) {
+                String ncm = (p.getNcm() != null && !p.getNcm().isEmpty()) ? p.getNcm() : "";
+                PdfPCell cellNcm = new PdfPCell(new Phrase(ncm, fontCelulas));
+                cellNcm.setHorizontalAlignment(Element.ALIGN_CENTER);
+                table.addCell(cellNcm);
+
+                table.addCell(new Phrase(p.getNome(), fontCelulas));
+
+                PdfPCell cellQtd = new PdfPCell(new Phrase(String.valueOf(p.getQuantidade()), fontCelulas));
+                cellQtd.setHorizontalAlignment(Element.ALIGN_CENTER);
+                table.addCell(cellQtd);
+
+                String unidade = (p.getUnidade() != null && !p.getUnidade().isEmpty()) ? p.getUnidade() : "UN";
+                PdfPCell cellUnid = new PdfPCell(new Phrase(unidade, fontCelulas));
+                cellUnid.setHorizontalAlignment(Element.ALIGN_CENTER);
+                table.addCell(cellUnid);
+
+                BigDecimal preco = p.getPreco() != null ? p.getPreco() : BigDecimal.ZERO;
+                PdfPCell cellPreco = new PdfPCell(new Phrase(String.format("%.2f", preco), fontCelulas));
+                cellPreco.setHorizontalAlignment(Element.ALIGN_RIGHT);
+                table.addCell(cellPreco);
+
+                BigDecimal total = preco.multiply(new BigDecimal(p.getQuantidade()));
+                PdfPCell cellTotal = new PdfPCell(new Phrase(String.format("%.2f", total), fontCelulas));
+                cellTotal.setHorizontalAlignment(Element.ALIGN_RIGHT);
+                table.addCell(cellTotal);
+
+                table.addCell(new Phrase("", fontCelulas));
+            }
+
+            document.add(table);
+            document.close();
+
+        } catch (DocumentException e) {
+            e.printStackTrace();
+        }
+
         return out.toByteArray();
     }
 }

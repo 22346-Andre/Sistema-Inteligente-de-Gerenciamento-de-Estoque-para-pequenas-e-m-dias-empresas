@@ -2,7 +2,6 @@ package com.smartstock.backend.conttroler;
 
 import com.smartstock.backend.dto.ProdutoDTO;
 import com.smartstock.backend.model.Produto;
-import com.smartstock.backend.repository.ProdutoRepository;
 import com.smartstock.backend.service.ProdutoService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,9 +16,6 @@ public class ProdutoController {
     @Autowired
     private ProdutoService service;
 
-    @Autowired
-    private ProdutoRepository produtoRepository; // Injeção necessária para o filtro
-
     @GetMapping
     public List<Produto> listar() {
         return service.listarTodos();
@@ -30,10 +26,10 @@ public class ProdutoController {
         return ResponseEntity.ok(service.salvar(dto));
     }
 
-    // Rota 2: O FILTRO (Traz apenas os que estão a acabar)
+    // Traz apenas os que estão a acabar, filtrado por empresa
     @GetMapping("/criticos")
     public List<Produto> listarEstoqueCritico() {
-        return produtoRepository.findProdutosComEstoqueBaixo();
+        return service.listarEstoqueCritico();
     }
 
     // Rota 3: ATUALIZAR UM PRODUTO (PUT)

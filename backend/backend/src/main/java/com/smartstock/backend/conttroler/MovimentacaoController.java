@@ -1,4 +1,4 @@
-package  com.smartstock.backend.conttroler;
+package com.smartstock.backend.conttroler;
 
 import com.smartstock.backend.dto.MovimentacaoDTO;
 import com.smartstock.backend.model.Movimentacao;
@@ -17,13 +17,14 @@ public class MovimentacaoController {
     @Autowired
     private MovimentacaoService service;
 
-    @PostMapping
-    public ResponseEntity<Movimentacao> registrar(@RequestBody @Valid MovimentacaoDTO dto) {
-        return ResponseEntity.ok(service.registrar(dto));
-    }
-
     @GetMapping
     public List<Movimentacao> listar() {
+        // Agora ele chama o service, que vai extrair a Empresa do JWT com segurança!
         return service.listarTodas();
+    }
+
+    @PostMapping
+    public ResponseEntity<Movimentacao> registrar(@RequestBody @Valid MovimentacaoDTO dto) {
+        return ResponseEntity.ok(service.registrarMovimentacao(dto));
     }
 }

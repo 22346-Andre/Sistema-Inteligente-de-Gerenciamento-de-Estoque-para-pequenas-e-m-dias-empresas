@@ -2,6 +2,7 @@ package com.smartstock.backend.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -20,4 +21,8 @@ public class UsuarioDTO {
     private String senha;
 
     private String perfil;
+
+    //  Exigimos a Empresa no momento de criar o funcionário
+    @NotNull(message = "O ID da empresa é obrigatório para cadastrar o usuário")
+    private Long empresaId;
 }

@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
 
-@Data // O Lombok cria Getters, Setters e toString sozinho
+@Data
 @Entity
 @Table(name = "produtos")
 public class Produto {
@@ -20,4 +20,13 @@ public class Produto {
 
     @Column(name = "estoque_minimo")
     private Integer estoqueMinimo;
+
+    // --- CAMPOS PARA O RELATÓRIO FISCAL ---
+    private String ncm;
+    private String unidade;
+
+    // O VÍNCULO COM A EMPRESA ---
+    @ManyToOne
+    @JoinColumn(name = "empresa_id") // Cria a coluna empresa_id no banco
+    private Empresa empresa;
 }
