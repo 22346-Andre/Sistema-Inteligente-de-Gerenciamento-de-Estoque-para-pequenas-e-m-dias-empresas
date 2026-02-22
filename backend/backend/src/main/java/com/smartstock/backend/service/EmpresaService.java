@@ -27,6 +27,7 @@ public class EmpresaService {
         empresa.setCnpj(dto.getCnpj());
         empresa.setRazaoSocial(dto.getRazaoSocial());
         empresa.setNomeFantasia(dto.getNomeFantasia());
+        empresa.setEmailContato(dto.getEmailContato());
 
         return repository.save(empresa);
     }

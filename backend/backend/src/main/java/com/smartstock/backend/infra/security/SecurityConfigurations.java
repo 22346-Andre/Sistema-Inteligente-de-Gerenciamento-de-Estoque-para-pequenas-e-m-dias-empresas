@@ -43,6 +43,7 @@ public class SecurityConfigurations {
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll() // Libera Login
                         .requestMatchers(HttpMethod.POST, "/usuarios").permitAll()   // Libera Cadastro
                         .requestMatchers(HttpMethod.POST, "/email/send").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/empresas").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll() // Swagger
                         .anyRequest().authenticated())
                 .csrf(csrf -> csrf.disable())
