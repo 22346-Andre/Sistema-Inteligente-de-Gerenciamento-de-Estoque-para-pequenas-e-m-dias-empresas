@@ -3,6 +3,8 @@ package com.smartstock.backend.model;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Data
 @Entity
 @Table(name = "empresas")
@@ -22,4 +24,7 @@ public class Empresa {
 
     @Column(name = "email_contato")
     private String emailContato;
+
+
+    private LocalDateTime ultimoAcesso = LocalDateTime.now(); // Já começa com a data de hoje ao criar
 }
