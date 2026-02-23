@@ -55,7 +55,7 @@ public class VerificadorEstoqueService {
         for (Produto p : produtos) {
             conteudo.append("📦 Produto: ").append(p.getNome()).append("\n");
             conteudo.append("   Estoque Atual: ").append(p.getQuantidade());
-            if(p.getUnidade() != null) conteudo.append(" ").append(p.getUnidade()); // Coloquei a unidade aqui pra ficar chique!
+            if(p.getUnidade() != null) conteudo.append(" ").append(p.getUnidade());
             conteudo.append("\n");
             conteudo.append("   Mínimo Exigido: ").append(p.getEstoqueMinimo()).append("\n");
             conteudo.append("----------------------------------------\n");
