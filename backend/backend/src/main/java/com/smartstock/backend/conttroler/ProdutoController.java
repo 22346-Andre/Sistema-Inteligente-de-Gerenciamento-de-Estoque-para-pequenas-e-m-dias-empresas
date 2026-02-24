@@ -5,8 +5,12 @@ import com.smartstock.backend.model.Produto;
 import com.smartstock.backend.service.ProdutoService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -19,6 +23,18 @@ public class ProdutoController {
     @GetMapping
     public List<Produto> listar() {
         return service.listarTodos();
+    }
+
+    // --- A NOSSA NOVA ROTA DE BUSCA AVANÇADA VEM AQUI ---
+    @GetMapping("/busca-avancada")
+    public ResponseEntity<List<Produto>> buscarProdutosAvancado(
+            @RequestParam(required = false) String categoria,
+            @RequestParam(required = false) BigDecimal precoMin,
+            @RequestParam(required = false) BigDecimal precoMax,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dataInicio) {
+
+        List<Produto> produtos = service.buscaAvancada(categoria, precoMin, precoMax, dataInicio);
+        return ResponseEntity.ok(produtos);
     }
 
     @PostMapping

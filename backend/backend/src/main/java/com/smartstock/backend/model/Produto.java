@@ -5,9 +5,10 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Data
-@NoArgsConstructor // O OpenCSV precisa de um construtor vazio para instanciar a classe
+@NoArgsConstructor
 @Entity
 @Table(name = "produtos")
 public class Produto {
@@ -38,8 +39,26 @@ public class Produto {
     @CsvBindByName(column = "UNIDADE")
     private String unidade;
 
-    // A empresa NÃO vem do Excel, ela é injetada pelo sistema (Tenant)
+
+    @CsvBindByName(column = "CATEGORIA")
+    private String categoria;
+
+    @Column(name = "data_atualizacao")
+    private LocalDateTime dataAtualizacao;
+
+    //  (Dono do produto)
     @ManyToOne
     @JoinColumn(name = "empresa_id")
     private Empresa empresa;
+
+
+    @PrePersist
+    protected void onCreate() {
+        dataAtualizacao = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        dataAtualizacao = LocalDateTime.now();
+    }
 }

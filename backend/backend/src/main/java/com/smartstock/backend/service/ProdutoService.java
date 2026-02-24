@@ -6,10 +6,16 @@ import com.smartstock.backend.model.Produto;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
+import com.smartstock.backend.specification.ProdutoSpecification;
+import org.springframework.data.jpa.domain.Specification;
 
 @Service
 public class ProdutoService {
@@ -98,4 +104,31 @@ public class ProdutoService {
 
         repository.deleteById(id);
     }
+    // NOVO MÉTODO DE BUSCA AVANÇADA
+    public List<Produto> buscaAvancada(String categoria, BigDecimal precoMin, BigDecimal precoMax, LocalDateTime dataInicio) {
+
+        // Pega a empresa de quem está fazendo a requisição
+        Long empresaId = getEmpresaIdLogada();
+
+
+        Specification<Produto> spec = ProdutoSpecification.pertenceAEmpresa(empresaId);
+
+        // 2. Vai "grudando" os filtros apenas se o usuário mandou algo
+        if (categoria != null && !categoria.isBlank()) {
+            spec = spec.and(ProdutoSpecification.categoriaContem(categoria));
+        }
+
+        if (precoMin != null || precoMax != null) {
+            spec = spec.and(ProdutoSpecification.precoEntre(precoMin, precoMax));
+        }
+
+        if (dataInicio != null) {
+            spec = spec.and(ProdutoSpecification.atualizadoApos(dataInicio));
+        }
+
+        // 3. Executa a super consulta no banco de dados
+        return repository.findAll(spec);
+    }
+
+
 }
