@@ -16,10 +16,10 @@ public class TratadorDeErros {
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Map<String, String>> tratarErroDeCredenciais(BadCredentialsException ex) {
         Map<String, String> resposta = new HashMap<>();
-        // Mensagem amigável para o Front-end mostrar na tela
+
         resposta.put("erro", "Acesso negado: E-mail ou senha incorretos.");
 
-        // Retorna 401 (Unauthorized) - O padrão correto da web para falha de login
+        // Retorna 401 (Unauthorized)
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(resposta);
     }
 

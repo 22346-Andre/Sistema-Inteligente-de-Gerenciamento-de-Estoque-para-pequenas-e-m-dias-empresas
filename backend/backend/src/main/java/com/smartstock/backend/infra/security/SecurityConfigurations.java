@@ -36,18 +36,22 @@ public class SecurityConfigurations {
     @Value("${rsa.private-key}")
     private RSAPrivateKey privateKey;
 
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/auth/login").permitAll() // Libera Login
-                        .requestMatchers(HttpMethod.POST, "/usuarios").permitAll()   // Libera Cadastro
-                        .requestMatchers(HttpMethod.POST, "/email/send").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/empresas").permitAll()
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll() // Swagger
+                        // 1. Libera apenas o essencial (A Porta da Frente)
+                        .requestMatchers(HttpMethod.POST, "/auth/login").permitAll() // Para obter o Token
+                        .requestMatchers(HttpMethod.POST, "/auth/registrar-empresa").permitAll() // Para criar a Empresa e o 1º ADMIN
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll() // Para documentação
+
+                        // 2. Tranca todo o resto do sistema! (A Porta dos Fundos)
                         .anyRequest().authenticated())
+
+                // 3. Configurações de API REST padrão
                 .csrf(csrf -> csrf.disable())
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(org.springframework.security.config.Customizer.withDefaults()))
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
         return http.build();

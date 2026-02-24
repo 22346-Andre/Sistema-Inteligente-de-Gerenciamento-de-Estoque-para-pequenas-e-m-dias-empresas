@@ -26,90 +26,128 @@ public class UsuarioService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    // --- MÉTODO AUXILIAR  (JWT) ---
-    private Long getEmpresaIdLogada() {
-        // Verifica se a requisição tem um token válido antes de tentar extrair (útil pois o /usuarios é aberto no cadastro)
+    // --- NOVO MÉTODO AUXILIAR: BUSCAR O USUÁRIO LOGADO INTEIRO ---
+    private Usuario getUsuarioLogado() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        if (principal instanceof Jwt) {
-            Jwt jwt = (Jwt) principal;
-            Long empresaId = jwt.getClaim("empresaId");
-            if (empresaId == null) {
-                throw new RuntimeException("Erro: O usuário logado não possui vínculo com nenhuma empresa.");
-            }
-            return empresaId;
+        if (principal instanceof Jwt jwt) {
+            // Assume-se que o email foi colocado no "Subject" ou "sub" ao gerar o JWT
+            String email = jwt.getSubject();
+            return repository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("Erro: Usuário logado não encontrado na base de dados."));
         }
         throw new RuntimeException("Acesso negado: Usuário não autenticado ou token inválido.");
     }
 
-    // 1. LISTAR TODOS (BLINDADO)
+    // 1. LISTAR TODOS
     public List<Usuario> listarTodos() {
-        // A MÁGICA: Retorna apenas os funcionários da empresa do gestor logado!
-        return repository.findByEmpresaId(getEmpresaIdLogada());
+        Usuario logado = getUsuarioLogado();
+
+        // O SUPER_ADMIN vê todos os usuários da plataforma. O ADMIN vê só da sua empresa.
+        if ("SUPER_ADMIN".equals(logado.getPerfil())) {
+            return repository.findAll();
+        }
+        return repository.findByEmpresaId(logado.getEmpresa().getId());
     }
 
-    // 2. BUSCAR POR ID (BLINDADO)
+    // 2. BUSCAR POR ID
     public Optional<Usuario> buscarPorId(Long id) {
+        Usuario logado = getUsuarioLogado();
         Optional<Usuario> usuarioOpt = repository.findById(id);
 
         if (usuarioOpt.isPresent()) {
             Usuario usuario = usuarioOpt.get();
-            // Trava: O usuário que eu estou tentando ver é da minha empresa?
-            if (!usuario.getEmpresa().getId().equals(getEmpresaIdLogada())) {
+
+            // Regra do Cercadinho no GET
+            if (!"SUPER_ADMIN".equals(logado.getPerfil()) && !usuario.getEmpresa().getId().equals(logado.getEmpresa().getId())) {
                 throw new RuntimeException("Acesso negado: Este usuário pertence a outra empresa.");
             }
         }
         return usuarioOpt;
     }
 
-    // 3. SALVAR (Aberto: pois o dono da empresa pode estar a se cadastrar pela 1ª vez)
+    // 3. SALVAR ( Apenas ADMIN cria funcionários)
     public Usuario salvar(UsuarioDTO dto) {
+        Usuario adminLogado = getUsuarioLogado(); // Descobre quem é o chefe logado
+
         if (repository.findByEmail(dto.getEmail()).isPresent()) {
             throw new RuntimeException("Este e-mail já está cadastrado!");
         }
-
-        Empresa empresa = empresaRepository.findById(dto.getEmpresaId())
-                .orElseThrow(() -> new RuntimeException("Empresa não encontrada com o ID: " + dto.getEmpresaId()));
 
         Usuario usuario = new Usuario();
         usuario.setNome(dto.getNome());
         usuario.setEmail(dto.getEmail());
         usuario.setSenha(passwordEncoder.encode(dto.getSenha()));
-        usuario.setPerfil(dto.getPerfil() != null ? dto.getPerfil() : "FUNCIONARIO");
-        usuario.setEmpresa(empresa);
+
+        // Ninguém cria SUPER_ADMIN
+        if ("SUPER_ADMIN".equals(dto.getPerfil())) {
+            throw new RuntimeException("Acesso negado: Você não tem permissão para criar um SUPER_ADMIN.");
+        }
+
+        // Define como USER (ou ADMIN, se for o caso), mas o padrão é USER.
+        usuario.setPerfil(dto.getPerfil() != null ? dto.getPerfil() : "USER");
+
+        //  O novo usuário é OBRIGATORIAMENTE da mesma empresa do ADMIN que está cadastrando
+        usuario.setEmpresa(adminLogado.getEmpresa());
 
         return repository.save(usuario);
     }
 
-    // 4. ATUALIZAR (BLINDADO)
+    // 4. ATUALIZAR )
     public Usuario atualizar(Long id, UsuarioDTO dto) {
-        Usuario usuario = repository.findById(id)
+        Usuario adminLogado = getUsuarioLogado();
+        Usuario usuarioAlvo = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
 
-        // Trava de segurança
-        if (!usuario.getEmpresa().getId().equals(getEmpresaIdLogada())) {
-            throw new RuntimeException("Acesso negado: Você não pode alterar um funcionário de outra empresa.");
+        // Regra da Imunidade Superior
+        if ("SUPER_ADMIN".equals(usuarioAlvo.getPerfil()) && !"SUPER_ADMIN".equals(adminLogado.getPerfil())) {
+            throw new RuntimeException("Acesso negado: Um ADMIN não pode alterar um SUPER_ADMIN.");
+        }
+
+        // Regra do Cercadinho
+        if (!"SUPER_ADMIN".equals(adminLogado.getPerfil())) {
+            if (!usuarioAlvo.getEmpresa().getId().equals(adminLogado.getEmpresa().getId())) {
+                throw new RuntimeException("Acesso negado: Você não pode alterar um funcionário de outra empresa.");
+            }
+        }
+
+        //  Impedir que um ADMIN transforme alguém em SUPER_ADMIN
+        if ("SUPER_ADMIN".equals(dto.getPerfil()) && !"SUPER_ADMIN".equals(adminLogado.getPerfil())) {
+            throw new RuntimeException("Acesso negado: Apenas o dono do sistema pode promover um usuário a SUPER_ADMIN.");
         }
 
         Empresa empresa = empresaRepository.findById(dto.getEmpresaId())
                 .orElseThrow(() -> new RuntimeException("Empresa não encontrada com o ID: " + dto.getEmpresaId()));
 
-        usuario.setNome(dto.getNome());
-        usuario.setEmail(dto.getEmail());
-        usuario.setPerfil(dto.getPerfil());
-        usuario.setEmpresa(empresa);
+        usuarioAlvo.setNome(dto.getNome());
+        usuarioAlvo.setEmail(dto.getEmail());
+        usuarioAlvo.setPerfil(dto.getPerfil());
+        usuarioAlvo.setEmpresa(empresa);
 
-        return repository.save(usuario);
+        return repository.save(usuarioAlvo);
     }
 
-    // 5. DELETAR (BLINDADO)
+    // 5. DELETAR
     public void deletar(Long id) {
-        Usuario usuario = repository.findById(id)
+        Usuario adminLogado = getUsuarioLogado();
+        Usuario usuarioAlvo = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
 
-        // Trava de segurança
-        if (!usuario.getEmpresa().getId().equals(getEmpresaIdLogada())) {
-            throw new RuntimeException("Acesso negado: Você não pode deletar um funcionário de outra empresa.");
+        // 1. Regra do Não Suicídio
+        if (adminLogado.getId().equals(usuarioAlvo.getId())) {
+            throw new RuntimeException("Operação inválida: Você não pode deletar a sua própria conta.");
+        }
+
+        // 2. Regra da Imunidade Superior
+        if ("SUPER_ADMIN".equals(usuarioAlvo.getPerfil()) && !"SUPER_ADMIN".equals(adminLogado.getPerfil())) {
+            throw new RuntimeException("Acesso negado: Um ADMIN não tem autoridade para apagar um SUPER_ADMIN.");
+        }
+
+        // 3. Regra do Cercadinho
+        if (!"SUPER_ADMIN".equals(adminLogado.getPerfil())) {
+            if (!usuarioAlvo.getEmpresa().getId().equals(adminLogado.getEmpresa().getId())) {
+                throw new RuntimeException("Acesso negado: Você não pode apagar um funcionário de outra empresa.");
+            }
         }
 
         repository.deleteById(id);
