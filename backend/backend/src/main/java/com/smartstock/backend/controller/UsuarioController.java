@@ -1,4 +1,4 @@
-package com.smartstock.backend.conttroler;
+package com.smartstock.backend.controller;
 
 import com.smartstock.backend.dto.UsuarioDTO;
 import com.smartstock.backend.model.Usuario;

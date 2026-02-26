@@ -1,4 +1,4 @@
-package com.smartstock.backend.conttroler;
+package com.smartstock.backend.controller;
 
 import com.smartstock.backend.service.RelatorioPdfService;
 import org.springframework.http.HttpHeaders;

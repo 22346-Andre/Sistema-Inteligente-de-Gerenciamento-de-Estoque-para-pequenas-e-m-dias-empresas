@@ -44,6 +44,7 @@ public class SecurityConfigurations {
                         // 1. Libera apenas o essencial (A Porta da Frente)
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll() // Para obter o Token
                         .requestMatchers(HttpMethod.POST, "/auth/registrar-empresa").permitAll() // Para criar a Empresa e o 1º ADMIN
+                        .requestMatchers(HttpMethod.POST, "/empresas").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll() // Para documentação
 
                         // 2. Tranca todo o resto do sistema! (A Porta dos Fundos)

@@ -1,10 +1,17 @@
 package com.smartstock.backend.service;
 
+import com.smartstock.backend.dto.LoteDTO;
 import com.smartstock.backend.dto.ProdutoDTO;
 import com.smartstock.backend.model.Empresa;
+import com.smartstock.backend.model.Lote;
+import com.smartstock.backend.model.Movimentacao;
 import com.smartstock.backend.model.Produto;
+import com.smartstock.backend.model.TipoMovimentacao;
 import com.smartstock.backend.repository.EmpresaRepository;
+import com.smartstock.backend.repository.LoteRepository;
+import com.smartstock.backend.repository.MovimentacaoRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
+import com.smartstock.backend.specification.ProdutoSpecification;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -14,8 +21,6 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import com.smartstock.backend.specification.ProdutoSpecification;
-import org.springframework.data.jpa.domain.Specification;
 
 @Service
 public class ProdutoService {
@@ -25,6 +30,13 @@ public class ProdutoService {
 
     @Autowired
     private EmpresaRepository empresaRepository;
+
+    @Autowired
+    private LoteRepository loteRepository;
+
+
+    @Autowired
+    private MovimentacaoRepository movimentacaoRepository;
 
     // --- MÉTODO AUXILIAR PARA NÃO REPETIR CÓDIGO (DRY) ---
     private Long getEmpresaIdLogada() {
@@ -38,11 +50,9 @@ public class ProdutoService {
     }
 
     public List<Produto> listarTodos() {
-        // Retorna SÓ os produtos da empresa logada!
         return repository.findByEmpresaId(getEmpresaIdLogada());
     }
 
-    // --- NOVO: Traz os produtos críticos SÓ da empresa logada ---
     public List<Produto> listarEstoqueCritico() {
         return repository.findProdutosComEstoqueBaixoPorEmpresa(getEmpresaIdLogada());
     }
@@ -54,8 +64,6 @@ public class ProdutoService {
         }
 
         Long empresaIdLogada = getEmpresaIdLogada();
-
-        // Busca a Empresa real no banco. Se não achar, dá erro.
         Empresa empresa = empresaRepository.findById(empresaIdLogada)
                 .orElseThrow(() -> new RuntimeException("Erro: Empresa não encontrada para o usuário logado com ID " + empresaIdLogada));
 
@@ -67,8 +75,6 @@ public class ProdutoService {
         produto.setEstoqueMinimo(dto.getEstoqueMinimo() != null ? dto.getEstoqueMinimo() : 5);
         produto.setNcm(dto.getNcm());
         produto.setUnidade(dto.getUnidade() != null ? dto.getUnidade().toUpperCase() : "UN");
-
-        // Marca produto com a empresa encontrada via JWT
         produto.setEmpresa(empresa);
 
         return repository.save(produto);
@@ -78,7 +84,6 @@ public class ProdutoService {
         Produto produto = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Produto não encontrado com o ID: " + id));
 
-        // TRAVA DE SEGURANÇA SAAS
         if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
             throw new RuntimeException("Acesso negado: Você não pode alterar um produto de outra empresa.");
         }
@@ -97,38 +102,102 @@ public class ProdutoService {
         Produto produto = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Produto não encontrado com o ID: " + id));
 
-        // TRAVA DE SEGURANÇA SAAS
         if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
             throw new RuntimeException("Acesso negado: Você não pode deletar um produto de outra empresa.");
         }
 
         repository.deleteById(id);
     }
-    // NOVO MÉTODO DE BUSCA AVANÇADA
+
     public List<Produto> buscaAvancada(String categoria, BigDecimal precoMin, BigDecimal precoMax, LocalDateTime dataInicio) {
-
-        // Pega a empresa de quem está fazendo a requisição
         Long empresaId = getEmpresaIdLogada();
-
-
         Specification<Produto> spec = ProdutoSpecification.pertenceAEmpresa(empresaId);
 
-        // 2. Vai "grudando" os filtros apenas se o usuário mandou algo
         if (categoria != null && !categoria.isBlank()) {
             spec = spec.and(ProdutoSpecification.categoriaContem(categoria));
         }
-
         if (precoMin != null || precoMax != null) {
             spec = spec.and(ProdutoSpecification.precoEntre(precoMin, precoMax));
         }
-
         if (dataInicio != null) {
             spec = spec.and(ProdutoSpecification.atualizadoApos(dataInicio));
         }
 
-        // 3. Executa a super consulta no banco de dados
         return repository.findAll(spec);
     }
 
+    // --- ALGORITMO FEFO DE BAIXA AUTOMÁTICA + HISTÓRICO ---
+    @jakarta.transaction.Transactional
+    public void registrarSaida(Long produtoId, Integer quantidadeDesejada) {
 
+        Produto produto = repository.findById(produtoId)
+                .orElseThrow(() -> new RuntimeException("Produto não encontrado"));
+
+        if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
+            throw new RuntimeException("Acesso negado: Você não pode dar baixa em um produto de outra empresa.");
+        }
+
+        if (produto.getQuantidade() < quantidadeDesejada) {
+            throw new RuntimeException("Estoque insuficiente! Saldo atual: " + produto.getQuantidade());
+        }
+
+        List<Lote> lotes = loteRepository.findLotesDisponiveisParaBaixa(produtoId);
+        int quantidadeRestante = quantidadeDesejada;
+
+        for (Lote lote : lotes) {
+            if (quantidadeRestante == 0) break;
+
+            if (lote.getQuantidade() <= quantidadeRestante) {
+                quantidadeRestante -= lote.getQuantidade();
+                lote.setQuantidade(0);
+            } else {
+                lote.setQuantidade(lote.getQuantidade() - quantidadeRestante);
+                quantidadeRestante = 0;
+            }
+            loteRepository.save(lote);
+        }
+
+        produto.setQuantidade(produto.getQuantidade() - quantidadeDesejada);
+        Produto produtoAtualizado = repository.save(produto);
+
+        // --- GERA O DIÁRIO DE BORDO AUTOMATICAMENTE (SAÍDA) ---
+        Movimentacao mov = new Movimentacao();
+        mov.setProduto(produtoAtualizado);
+        mov.setTipo(TipoMovimentacao.SAIDA);
+        mov.setQuantidade(quantidadeDesejada);
+        mov.setEmpresa(produtoAtualizado.getEmpresa());
+        movimentacaoRepository.save(mov);
+    }
+
+    // --- DAR ENTRADA NUM NOVO LOTE + HISTÓRICO ---
+    @jakarta.transaction.Transactional
+    public Produto adicionarLote(Long produtoId, LoteDTO dto) {
+
+        Produto produto = repository.findById(produtoId)
+                .orElseThrow(() -> new RuntimeException("Produto não encontrado"));
+
+        if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
+            throw new RuntimeException("Acesso negado: Não pode alterar o estoque de outra empresa.");
+        }
+
+        Lote novoLote = new Lote();
+        novoLote.setQuantidade(dto.getQuantidade());
+        novoLote.setDataValidade(dto.getDataValidade());
+        novoLote.setProduto(produto);
+        loteRepository.save(novoLote);
+
+        int quantidadeAtual = produto.getQuantidade() != null ? produto.getQuantidade() : 0;
+        produto.setQuantidade(quantidadeAtual + dto.getQuantidade());
+        Produto produtoAtualizado = repository.save(produto);
+
+        // --- GERA O DIÁRIO DE BORDO AUTOMATICAMENTE (ENTRADA) ---
+        Movimentacao mov = new Movimentacao();
+        mov.setProduto(produtoAtualizado);
+        mov.setTipo(TipoMovimentacao.ENTRADA);
+        mov.setQuantidade(dto.getQuantidade());
+        mov.setEmpresa(produtoAtualizado.getEmpresa());
+        movimentacaoRepository.save(mov);
+
+        return produtoAtualizado;
+    }
 }

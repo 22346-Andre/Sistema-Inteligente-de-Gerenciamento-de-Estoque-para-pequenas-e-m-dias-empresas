@@ -5,17 +5,22 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
 import com.smartstock.backend.model.Empresa;
+import com.smartstock.backend.model.Lote;
 import com.smartstock.backend.model.Produto;
 import com.smartstock.backend.repository.EmpresaRepository;
+import com.smartstock.backend.repository.LoteRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
-
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -25,12 +30,25 @@ public class ImportacaoService {
 
     private final ProdutoRepository produtoRepository;
     private final EmpresaRepository empresaRepository;
+    private final LoteRepository loteRepository;
 
-    public ImportacaoService(ProdutoRepository produtoRepository, EmpresaRepository empresaRepository) {
+    public ImportacaoService(ProdutoRepository produtoRepository, EmpresaRepository empresaRepository, LoteRepository loteRepository) {
         this.produtoRepository = produtoRepository;
         this.empresaRepository = empresaRepository;
+        this.loteRepository = loteRepository;
     }
 
+    // --- MÉTODO AUXILIAR PARA PEGAR A EMPRESA DO TOKEN JWT ---
+    private Long getEmpresaIdLogada() {
+        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Long empresaId = jwt.getClaim("empresaId");
+        if (empresaId == null) {
+            throw new RuntimeException("Erro: O usuário logado não possui vínculo com nenhuma empresa.");
+        }
+        return empresaId;
+    }
+
+    @Transactional // Garante que se der erro, ele desfaz a importação inteira
     public String processarFicheiro(MultipartFile ficheiro) throws Exception {
         String nomeFicheiro = ficheiro.getOriginalFilename();
         List<Produto> produtosLidos;
@@ -44,57 +62,54 @@ public class ImportacaoService {
             throw new IllegalArgumentException("Formato não suportado. Envie apenas CSV ou XML.");
         }
 
-        /* * =========================================================
-         * LÓGICA MULTI-TENANT: VINCULAR A EMPRESA
-         * =========================================================
-         */
-        Long tenantIdAtual = 1L; // Ex: TenantContext.getCurrentTenant();
-
+        // 2. LÓGICA MULTI-TENANT: Descobre de quem é o arquivo de verdade
+        Long tenantIdAtual = getEmpresaIdLogada();
         Empresa empresaLogada = empresaRepository.findById(tenantIdAtual)
                 .orElseThrow(() -> new RuntimeException("Empresa não encontrada no contexto de segurança."));
 
-        // 2. Prepara as listas para separar o que é novo do que é atualização
         List<Produto> produtosNovos = new ArrayList<>();
         List<Produto> produtosAtualizados = new ArrayList<>();
         List<String> nomesAdicionados = new ArrayList<>();
 
-        // 3. Verifica produto por produto
+        // 3. Processa produto por produto
         for (Produto pLido : produtosLidos) {
 
             Optional<Produto> produtoExistente = produtoRepository.findByNomeAndEmpresa(pLido.getNome(), empresaLogada);
+            Integer quantidadeLida = (pLido.getQuantidade() != null) ? pLido.getQuantidade() : 0;
 
             if (produtoExistente.isPresent()) {
-                // O PRODUTO JÁ EXISTE: apenas somar o estoque
+                // O PRODUTO JÁ EXISTE: Vamos atualizar
                 Produto pBase = produtoExistente.get();
-
-                Integer quantidadeNova = (pLido.getQuantidade() != null) ? pLido.getQuantidade() : 0;
                 Integer quantidadeAtual = (pBase.getQuantidade() != null) ? pBase.getQuantidade() : 0;
 
-                pBase.setQuantidade(quantidadeAtual + quantidadeNova);
+                // Soma a quantidade
+                pBase.setQuantidade(quantidadeAtual + quantidadeLida);
+                if (pLido.getPreco() != null) pBase.setPreco(pLido.getPreco());
 
-                // Atualizar preço também
-                if (pLido.getPreco() != null) {
-                    pBase.setPreco(pLido.getPreco());
+                Produto pSalvo = produtoRepository.save(pBase);
+                produtosAtualizados.add(pSalvo);
+
+                // CRIA O LOTE PARA AS UNIDADES NOVAS QUE ENTRARAM
+                if (quantidadeLida > 0) {
+                    criarLoteInicial(pSalvo, quantidadeLida);
                 }
 
-                produtosAtualizados.add(pBase);
             } else {
-                // O PRODUTO NÃO EXISTE: Prepara para ser criado
+                // O PRODUTO NÃO EXISTE: cria
                 pLido.setEmpresa(empresaLogada);
-                produtosNovos.add(pLido);
-                nomesAdicionados.add(pLido.getNome());
+
+                Produto pSalvo = produtoRepository.save(pLido); // Salva para gerar o ID
+                produtosNovos.add(pSalvo);
+                nomesAdicionados.add(pSalvo.getNome());
+
+                // CRIA O LOTE INICIAL DESTE PRODUTO NOVO
+                if (quantidadeLida > 0) {
+                    criarLoteInicial(pSalvo, quantidadeLida);
+                }
             }
         }
 
-        // 4. Salva no banco de dados de forma dividida e otimizada
-        if (!produtosAtualizados.isEmpty()) {
-            produtoRepository.saveAll(produtosAtualizados);
-        }
-        if (!produtosNovos.isEmpty()) {
-            produtoRepository.saveAll(produtosNovos);
-        }
-
-        // 5. Monta o relatório que será exibido no Swagger/Frontend
+        // 4. Monta o relatório de retorno
         StringBuilder mensagem = new StringBuilder();
         mensagem.append("Processamento concluído com sucesso! \n");
         mensagem.append("- Produtos atualizados no estoque: ").append(produtosAtualizados.size()).append("\n");
@@ -108,14 +123,23 @@ public class ImportacaoService {
         return mensagem.toString();
     }
 
+    // --- MÉTODO AUXILIAR PARA GERAR OS LOTES FEFO ---
+    private void criarLoteInicial(Produto produto, Integer quantidade) {
+        Lote lote = new Lote();
+        lote.setProduto(produto);
+        lote.setQuantidade(quantidade);
+        // Coloca validade para daqui a 1 ano como padrão de segurança para o sistema não travar
+        lote.setDataValidade(LocalDate.now().plusYears(1));
+        loteRepository.save(lote);
+    }
+
     private List<Produto> lerCsv(MultipartFile ficheiro) throws Exception {
         try (Reader reader = new BufferedReader(new InputStreamReader(ficheiro.getInputStream(), StandardCharsets.UTF_8))) {
             CsvToBean<Produto> csvToBean = new CsvToBeanBuilder<Produto>(reader)
                     .withType(Produto.class)
                     .withIgnoreLeadingWhiteSpace(true)
-                    .withSeparator(';')
+                    .withSeparator(',')
                     .build();
-
             return csvToBean.parse();
         }
     }

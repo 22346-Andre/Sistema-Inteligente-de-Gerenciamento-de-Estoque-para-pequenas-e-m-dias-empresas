@@ -26,7 +26,7 @@ public class RelatorioPdfService {
 
     private final ProdutoRepository produtoRepository;
     private final MovimentacaoRepository movimentacaoRepository;
-    private final EmpresaRepository empresaRepository; // NOVO: Para buscar o nome real da empresa
+    private final EmpresaRepository empresaRepository;
 
     public RelatorioPdfService(ProdutoRepository produtoRepository, MovimentacaoRepository movimentacaoRepository, EmpresaRepository empresaRepository) {
         this.produtoRepository = produtoRepository;
@@ -34,7 +34,6 @@ public class RelatorioPdfService {
         this.empresaRepository = empresaRepository;
     }
 
-    // --- MÉTODO AUXILIAR DA CONFIANÇA ZERO (JWT) ---
     private Empresa getEmpresaLogada() {
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         Long empresaId = jwt.getClaim("empresaId");
@@ -47,14 +46,14 @@ public class RelatorioPdfService {
     }
 
     // ==========================================
-    // MÉTODO 1: BALANÇO GERAL DE ESTOQUE
+    // MÉTODO 1: BALANÇO GERAL DE ESTOQUE (COM FORNECEDOR)
     // ==========================================
     public byte[] gerarBalancoGeralPdf() {
         Empresa empresa = getEmpresaLogada();
-        //  Traz apenas os produtos desta empresa!
         List<Produto> produtosDaEmpresa = produtoRepository.findByEmpresaId(empresa.getId());
 
-        Document document = new Document(PageSize.A4);
+        // Alterado para Paisagem (rotate) para caber a nova coluna
+        Document document = new Document(PageSize.A4.rotate());
         ByteArrayOutputStream out = new ByteArrayOutputStream();
 
         try {
@@ -71,32 +70,50 @@ public class RelatorioPdfService {
             subtitulo.setAlignment(Element.ALIGN_CENTER);
             document.add(subtitulo);
 
-            PdfPTable table = new PdfPTable(4);
+            // AGORA SÃO 5 COLUNAS
+            PdfPTable table = new PdfPTable(5);
             table.setWidthPercentage(100);
-            table.setWidths(new float[]{3f, 1.5f, 1.5f, 1.5f});
+            table.setWidths(new float[]{2.5f, 1.5f, 1.5f, 1.5f, 3f});
 
             Font fontCabecalho = FontFactory.getFont(FontFactory.HELVETICA_BOLD);
             PdfPCell h1 = new PdfPCell(new Phrase("Produto", fontCabecalho));
             PdfPCell h2 = new PdfPCell(new Phrase("Preco (R$)", fontCabecalho));
             PdfPCell h3 = new PdfPCell(new Phrase("Qtd Atual", fontCabecalho));
             PdfPCell h4 = new PdfPCell(new Phrase("Minimo", fontCabecalho));
+            PdfPCell h5 = new PdfPCell(new Phrase("Fornecedor / Contato", fontCabecalho)); // NOVA COLUNA
 
             h1.setBackgroundColor(Color.LIGHT_GRAY);
             h2.setBackgroundColor(Color.LIGHT_GRAY);
             h3.setBackgroundColor(Color.LIGHT_GRAY);
             h4.setBackgroundColor(Color.LIGHT_GRAY);
-            table.addCell(h1); table.addCell(h2); table.addCell(h3); table.addCell(h4);
+            h5.setBackgroundColor(Color.LIGHT_GRAY); // Cor da nova coluna
+
+            table.addCell(h1); table.addCell(h2); table.addCell(h3); table.addCell(h4); table.addCell(h5);
 
             for (Produto p : produtosDaEmpresa) {
-                table.addCell(p.getNome());
-                table.addCell(p.getPreco() != null ? p.getPreco().toString() : "0.00");
+                table.addCell(new Phrase(p.getNome()));
+                table.addCell(new Phrase(p.getPreco() != null ? String.format("%.2f", p.getPreco()) : "0.00"));
 
-                PdfPCell cellQtd = new PdfPCell(new Phrase(String.valueOf(p.getQuantidade())));
-                if (p.getQuantidade() <= p.getEstoqueMinimo()) {
+                // BLINDAGEM CONTRA VALORES NULOS
+                Integer qtd = p.getQuantidade() != null ? p.getQuantidade() : 0;
+                Integer minimo = p.getEstoqueMinimo() != null ? p.getEstoqueMinimo() : 0;
+
+                PdfPCell cellQtd = new PdfPCell(new Phrase(String.valueOf(qtd)));
+                if (qtd <= minimo) {
                     cellQtd.setBackgroundColor(new Color(255, 204, 204));
                 }
                 table.addCell(cellQtd);
-                table.addCell(String.valueOf(p.getEstoqueMinimo()));
+                table.addCell(new Phrase(String.valueOf(minimo)));
+
+                // --- LÓGICA DO FORNECEDOR NA 5ª COLUNA ---
+                String infoFornecedor = "-";
+                if (p.getFornecedor() != null) {
+                    infoFornecedor = p.getFornecedor().getNome();
+                    if (p.getFornecedor().getTelefone() != null && !p.getFornecedor().getTelefone().isEmpty()) {
+                        infoFornecedor += "\n(" + p.getFornecedor().getTelefone() + ")";
+                    }
+                }
+                table.addCell(new Phrase(infoFornecedor));
             }
 
             document.add(table);
@@ -113,7 +130,6 @@ public class RelatorioPdfService {
     // ==========================================
     public byte[] gerarRelatorioMovimentacoesPdf() {
         Empresa empresa = getEmpresaLogada();
-        // Traz apenas as movimentações desta empresa!
         List<Movimentacao> movimentacoes = movimentacaoRepository.findByEmpresaIdOrderByDataMovimentacaoDesc(empresa.getId());
 
         Document document = new Document(PageSize.A4);
@@ -152,17 +168,18 @@ public class RelatorioPdfService {
             DateTimeFormatter formatadorData = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
             for (Movimentacao m : movimentacoes) {
-                table.addCell(m.getDataMovimentacao().format(formatadorData));
-                table.addCell(m.getProduto().getNome());
+                LocalDateTime dataMov = m.getDataMovimentacao() != null ? m.getDataMovimentacao() : LocalDateTime.now();
+                table.addCell(dataMov.format(formatadorData));
+                table.addCell(m.getProduto() != null ? m.getProduto().getNome() : "Desconhecido");
 
-                PdfPCell cellTipo = new PdfPCell(new Phrase(m.getTipo().name()));
-                if (m.getTipo().name().equals("ENTRADA")) {
+                PdfPCell cellTipo = new PdfPCell(new Phrase(m.getTipo() != null ? m.getTipo().name() : "-"));
+                if (m.getTipo() != null && m.getTipo().name().equals("ENTRADA")) {
                     cellTipo.setBackgroundColor(new Color(204, 255, 204));
                 } else {
                     cellTipo.setBackgroundColor(new Color(255, 204, 204));
                 }
                 table.addCell(cellTipo);
-                table.addCell(String.valueOf(m.getQuantidade()));
+                table.addCell(String.valueOf(m.getQuantidade() != null ? m.getQuantidade() : 0));
             }
 
             document.add(table);
@@ -179,7 +196,6 @@ public class RelatorioPdfService {
     // ==========================================
     public byte[] gerarRelatorioInventarioFiscalPdf() {
         Empresa empresa = getEmpresaLogada();
-        //  Traz apenas os produtos desta empresa!
         List<Produto> produtosDaEmpresa = produtoRepository.findByEmpresaId(empresa.getId());
 
         Document document = new Document(PageSize.A4.rotate());
@@ -229,9 +245,11 @@ public class RelatorioPdfService {
                 cellNcm.setHorizontalAlignment(Element.ALIGN_CENTER);
                 table.addCell(cellNcm);
 
-                table.addCell(new Phrase(p.getNome(), fontCelulas));
+                table.addCell(new Phrase(p.getNome() != null ? p.getNome() : "", fontCelulas));
 
-                PdfPCell cellQtd = new PdfPCell(new Phrase(String.valueOf(p.getQuantidade()), fontCelulas));
+                // BLINDAGEM AQUI TAMBÉM
+                Integer qtd = p.getQuantidade() != null ? p.getQuantidade() : 0;
+                PdfPCell cellQtd = new PdfPCell(new Phrase(String.valueOf(qtd), fontCelulas));
                 cellQtd.setHorizontalAlignment(Element.ALIGN_CENTER);
                 table.addCell(cellQtd);
 
@@ -245,7 +263,7 @@ public class RelatorioPdfService {
                 cellPreco.setHorizontalAlignment(Element.ALIGN_RIGHT);
                 table.addCell(cellPreco);
 
-                BigDecimal total = preco.multiply(new BigDecimal(p.getQuantidade()));
+                BigDecimal total = preco.multiply(new BigDecimal(qtd));
                 PdfPCell cellTotal = new PdfPCell(new Phrase(String.format("%.2f", total), fontCelulas));
                 cellTotal.setHorizontalAlignment(Element.ALIGN_RIGHT);
                 table.addCell(cellTotal);

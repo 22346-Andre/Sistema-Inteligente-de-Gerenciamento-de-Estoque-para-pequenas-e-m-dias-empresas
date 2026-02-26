@@ -21,8 +21,9 @@ public class VerificadorEstoqueService {
         this.emailService = emailService;
     }
 
-    // Roda a cada 2 horas (7200000 ms)
-    @Scheduled(fixedRate = 7200000)
+    // CRON: Segundos, Minutos, Horas, Dia do Mês, Mês, Dia da Semana
+    // "0 0 8 * * *" = Todo dia, às 08:00:00 da manhã.
+    @Scheduled(cron = "0 0 8 * * *", zone = "America/Sao_Paulo")
     public void verificarNiveisDeEstoque() {
         System.out.println("🔎 Iniciando verificação automática de estoque...");
 

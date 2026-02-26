@@ -6,6 +6,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -39,18 +41,24 @@ public class Produto {
     @CsvBindByName(column = "UNIDADE")
     private String unidade;
 
-
     @CsvBindByName(column = "CATEGORIA")
     private String categoria;
 
     @Column(name = "data_atualizacao")
     private LocalDateTime dataAtualizacao;
 
-    //  (Dono do produto)
+    // (Dono do produto)
     @ManyToOne
     @JoinColumn(name = "empresa_id")
     private Empresa empresa;
 
+    // LISTA DE LOTES
+    @OneToMany(mappedBy = "produto", cascade = CascadeType.ALL, orphanRemoval = true)
+
+    private List<Lote> lotes = new ArrayList<>();
+    @ManyToOne
+    @JoinColumn(name = "fornecedor_id")
+    private Fornecedor fornecedor;
 
     @PrePersist
     protected void onCreate() {

@@ -1,4 +1,4 @@
-package com.smartstock.backend.conttroler;
+package com.smartstock.backend.controller;
 
 import com.smartstock.backend.dto.ProdutoDTO;
 import com.smartstock.backend.model.Produto;
@@ -60,5 +60,18 @@ public class ProdutoController {
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         service.deletar(id);
         return ResponseEntity.noContent().build();
+    }
+    // Rota 5: ADICIONAR UM NOVO LOTE (ENTRADA DE STOCK)
+    @PostMapping("/{id}/lotes")
+    public ResponseEntity<Produto> darEntradaLote(@PathVariable Long id, @RequestBody com.smartstock.backend.dto.LoteDTO dto) {
+        Produto produtoAtualizado = service.adicionarLote(id, dto);
+        return ResponseEntity.ok(produtoAtualizado);
+    }
+
+    // Rota 6: REGISTAR VENDA/BAIXA (SAÍDA DE STOCK COM FEFO)
+    @PostMapping("/{id}/saida")
+    public ResponseEntity<String> registarSaida(@PathVariable Long id, @RequestBody com.smartstock.backend.dto.SaidaDTO dto) {
+        service.registrarSaida(id, dto.getQuantidadeDesejada());
+        return ResponseEntity.ok("Saída de " + dto.getQuantidadeDesejada() + " unidades registada com sucesso! Lotes atualizados via FEFO.");
     }
 }

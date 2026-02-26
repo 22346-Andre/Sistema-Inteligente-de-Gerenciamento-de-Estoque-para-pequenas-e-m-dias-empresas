@@ -15,12 +15,16 @@ public class Fornecedor {
     @Column(nullable = false)
     private String nome;
 
-    @Column(nullable = false, unique = true)
+
+    @Column(nullable = false)
     private String cnpj;
 
     private String telefone;
-
     private String email;
-
     private String endereco;
+
+
+    @ManyToOne
+    @JoinColumn(name = "empresa_id", nullable = false)
+    private Empresa empresa;
 }

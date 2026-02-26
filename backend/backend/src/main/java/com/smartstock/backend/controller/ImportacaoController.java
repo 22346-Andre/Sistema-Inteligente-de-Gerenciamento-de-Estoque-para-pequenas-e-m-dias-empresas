@@ -1,4 +1,4 @@
-package com.smartstock.backend.conttroler;
+package com.smartstock.backend.controller;
 
 import com.smartstock.backend.service.ImportacaoService;
 import org.springframework.http.HttpStatus;

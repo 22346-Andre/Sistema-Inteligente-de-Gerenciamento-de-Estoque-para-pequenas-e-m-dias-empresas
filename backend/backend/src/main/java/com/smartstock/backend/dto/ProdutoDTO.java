@@ -26,6 +26,7 @@ public class ProdutoDTO {
 
     private String ncm;
     private String unidade;
+    private Long fornecedorId;
 
 
 }
