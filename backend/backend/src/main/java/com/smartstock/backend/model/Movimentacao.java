@@ -29,4 +29,7 @@ public class Movimentacao {
     @ManyToOne
     @JoinColumn(name = "empresa_id")
     private Empresa empresa;
+
+    @Column(length = 255)
+    private String observacao;
 }
