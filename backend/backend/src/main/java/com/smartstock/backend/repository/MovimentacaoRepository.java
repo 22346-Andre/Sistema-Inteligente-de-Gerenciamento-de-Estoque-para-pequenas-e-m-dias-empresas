@@ -12,4 +12,11 @@ public interface MovimentacaoRepository extends JpaRepository<Movimentacao, Long
 
     //  Busca SÓ as movimentações da empresa logada, ordenadas por data
     List<Movimentacao> findByEmpresaIdOrderByDataMovimentacaoDesc(Long empresaId);
+
+    // Pega só as 5 últimas movimentações para a listinha inferior do Dashboard
+    List<Movimentacao> findTop5ByEmpresaIdOrderByDataMovimentacaoDesc(Long empresaId);
+
+    // Busca as movimentações da empresa a partir de uma data específica
+    @org.springframework.data.jpa.repository.Query("SELECT m FROM Movimentacao m WHERE m.empresa.id = :empresaId AND m.dataMovimentacao >= :dataInicio")
+    List<Movimentacao> findMovimentacoesUltimosDias(Long empresaId, java.time.LocalDateTime dataInicio);
 }

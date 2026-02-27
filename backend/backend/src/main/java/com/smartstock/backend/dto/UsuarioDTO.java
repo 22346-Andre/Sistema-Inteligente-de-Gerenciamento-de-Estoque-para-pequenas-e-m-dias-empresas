@@ -22,7 +22,8 @@ public class UsuarioDTO {
 
     private String perfil;
 
-    //  Exigimos a Empresa no momento de criar o funcionário
-    @NotNull(message = "O ID da empresa é obrigatório para cadastrar o usuário")
+
     private Long empresaId;
+
+    private String telefone;
 }

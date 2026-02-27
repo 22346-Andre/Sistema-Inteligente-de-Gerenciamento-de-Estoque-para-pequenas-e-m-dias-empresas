@@ -2,15 +2,8 @@ package com.smartstock.backend.service;
 
 import com.smartstock.backend.dto.LoteDTO;
 import com.smartstock.backend.dto.ProdutoDTO;
-import com.smartstock.backend.model.Empresa;
-import com.smartstock.backend.model.Lote;
-import com.smartstock.backend.model.Movimentacao;
-import com.smartstock.backend.model.Produto;
-import com.smartstock.backend.model.TipoMovimentacao;
-import com.smartstock.backend.repository.EmpresaRepository;
-import com.smartstock.backend.repository.LoteRepository;
-import com.smartstock.backend.repository.MovimentacaoRepository;
-import com.smartstock.backend.repository.ProdutoRepository;
+import com.smartstock.backend.model.*;
+import com.smartstock.backend.repository.*;
 import com.smartstock.backend.specification.ProdutoSpecification;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.jpa.domain.Specification;
@@ -33,6 +26,9 @@ public class ProdutoService {
 
     @Autowired
     private LoteRepository loteRepository;
+
+    @Autowired
+    private FornecedorRepository fornecedorRepository;
 
 
     @Autowired
@@ -58,14 +54,14 @@ public class ProdutoService {
     }
 
     public Produto salvar(ProdutoDTO dto) {
-
+        // 1. Validação de duplicidade
         if (repository.existsByNome(dto.getNome())) {
-            throw new RuntimeException("Erro: O produto '" + dto.getNome() + "' já existe no sistema! Registre uma ENTRADA nas Movimentações.");
+            throw new RuntimeException("Erro: O produto '" + dto.getNome() + "' já existe no sistema!");
         }
 
         Long empresaIdLogada = getEmpresaIdLogada();
         Empresa empresa = empresaRepository.findById(empresaIdLogada)
-                .orElseThrow(() -> new RuntimeException("Erro: Empresa não encontrada para o usuário logado com ID " + empresaIdLogada));
+                .orElseThrow(() -> new RuntimeException("Erro: Empresa não encontrada."));
 
         Produto produto = new Produto();
         produto.setNome(dto.getNome());
@@ -77,23 +73,50 @@ public class ProdutoService {
         produto.setUnidade(dto.getUnidade() != null ? dto.getUnidade().toUpperCase() : "UN");
         produto.setEmpresa(empresa);
 
+
+        if (dto.getFornecedorId() != null) {
+            Fornecedor fornecedor = fornecedorRepository.findById(dto.getFornecedorId())
+                    .orElseThrow(() -> new RuntimeException("Erro: Fornecedor ID " + dto.getFornecedorId() + " não encontrado!"));
+            produto.setFornecedor(fornecedor);
+        }
+
         return repository.save(produto);
     }
 
     public Produto atualizar(Long id, ProdutoDTO dto) {
+        // 1. Busca o produto ou estoura erro se não existir
         Produto produto = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Produto não encontrado com o ID: " + id));
 
+        // 2. Trava de segurança SaaS: Verifica se o produto pertence à empresa do usuário logado
         if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
             throw new RuntimeException("Acesso negado: Você não pode alterar um produto de outra empresa.");
         }
 
+        // 3. Atualiza os dados básicos
         produto.setNome(dto.getNome());
         produto.setDescricao(dto.getDescricao());
         produto.setPreco(dto.getPreco());
+        produto.setQuantidade(dto.getQuantidade()); // Adicionado: Sem isso a quantidade não muda no PUT
         produto.setEstoqueMinimo(dto.getEstoqueMinimo());
         produto.setNcm(dto.getNcm());
         produto.setUnidade(dto.getUnidade() != null ? dto.getUnidade().toUpperCase() : "UN");
+
+        // 4. O CASAMENTO: Vincula o Fornecedor ao Produto
+        if (dto.getFornecedorId() != null) {
+            Fornecedor fornecedor = fornecedorRepository.findById(dto.getFornecedorId())
+                    .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado com ID: " + dto.getFornecedorId()));
+
+            // Garante que o fornecedor também pertença à mesma empresa (Segurança extra)
+            if (!fornecedor.getEmpresa().getId().equals(getEmpresaIdLogada())) {
+                throw new RuntimeException("Acesso negado: Este fornecedor pertence a outra empresa.");
+            }
+
+            produto.setFornecedor(fornecedor);
+        } else {
+            // Se o DTO vier sem fornecedorId, limpamos o vínculo
+            produto.setFornecedor(null);
+        }
 
         return repository.save(produto);
     }

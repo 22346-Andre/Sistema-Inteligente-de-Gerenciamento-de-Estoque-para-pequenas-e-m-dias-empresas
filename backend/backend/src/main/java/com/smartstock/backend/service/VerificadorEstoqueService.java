@@ -1,82 +1,105 @@
 package com.smartstock.backend.service;
 
 import com.smartstock.backend.model.Empresa;
+import com.smartstock.backend.model.Lote;
 import com.smartstock.backend.model.Produto;
+import com.smartstock.backend.repository.EmpresaRepository;
+import com.smartstock.backend.repository.LoteRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 public class VerificadorEstoqueService {
 
+    private final EmpresaRepository empresaRepository;
     private final ProdutoRepository produtoRepository;
+    private final LoteRepository loteRepository;
     private final EmailService emailService;
 
-    public VerificadorEstoqueService(ProdutoRepository produtoRepository, EmailService emailService) {
+    public VerificadorEstoqueService(EmpresaRepository empresaRepository, ProdutoRepository produtoRepository, LoteRepository loteRepository, EmailService emailService) {
+        this.empresaRepository = empresaRepository;
         this.produtoRepository = produtoRepository;
+        this.loteRepository = loteRepository;
         this.emailService = emailService;
     }
 
-    // CRON: Segundos, Minutos, Horas, Dia do Mês, Mês, Dia da Semana
-    // "0 0 8 * * *" = Todo dia, às 08:00:00 da manhã.
+    // Roda todo dia às 08:00 da manhã para entregar o "Resumo Diário"
     @Scheduled(cron = "0 0 8 * * *", zone = "America/Sao_Paulo")
-    public void verificarNiveisDeEstoque() {
-        System.out.println("🔎 Iniciando verificação automática de estoque...");
+    public void relatorioDiarioInteligente() {
+        System.out.println("🤖 [IA SmartStock] Iniciando varredura de inteligência de estoque...");
 
-        List<Produto> produtosCriticos = produtoRepository.findProdutosComEstoqueBaixo();
+        List<Empresa> empresas = empresaRepository.findAll();
 
-        if (!produtosCriticos.isEmpty()) {
+        for (Empresa empresa : empresas) {
+            // 1. Coleta os 3 tipos de problemas
+            List<Produto> produtosCriticos = produtoRepository.findProdutosComEstoqueBaixoPorEmpresa(empresa.getId());
 
-            // MÁGICA SAAS: Agrupa os produtos por empresa!
-            Map<Empresa, List<Produto>> produtosPorEmpresa = produtosCriticos.stream()
-                    .collect(Collectors.groupingBy(Produto::getEmpresa));
+            LocalDate daqui30Dias = LocalDate.now().plusDays(30);
+            List<Lote> lotesVencendo = loteRepository.findLotesPertoDoVencimento(empresa.getId(), daqui30Dias);
 
-            // Dispara um e-mail para cada empresa encontrada
-            for (Map.Entry<Empresa, List<Produto>> entry : produtosPorEmpresa.entrySet()) {
-                Empresa empresa = entry.getKey();
-                List<Produto> produtos = entry.getValue();
+            LocalDateTime dezDiasAtras = LocalDateTime.now().minusDays(10);
+            List<Produto> encalhados = produtoRepository.findProdutosEncalhados(empresa.getId(), dezDiasAtras);
 
-                enviarRelatorioDeEstoqueBaixo(empresa, produtos);
+            // 2. Se a empresa tiver QUALQUER um dos 3 problemas, monta e envia o e-mail
+            if (!produtosCriticos.isEmpty() || !lotesVencendo.isEmpty() || !encalhados.isEmpty()) {
+                enviarResumoDiario(empresa, produtosCriticos, lotesVencendo, encalhados);
             }
-
-        } else {
-            System.out.println("✅ Verificação concluída: Nenhum produto com estoque baixo.");
         }
+        System.out.println("✅ Varredura concluída!");
     }
 
-    private void enviarRelatorioDeEstoqueBaixo(Empresa empresa, List<Produto> produtos) {
+    private void enviarResumoDiario(Empresa empresa, List<Produto> criticos, List<Lote> vencendo, List<Produto> encalhados) {
         StringBuilder conteudo = new StringBuilder();
-        conteudo.append("Olá, gestor da ").append(empresa.getNomeFantasia()).append("!\n\n");
-        conteudo.append("Atenção! Os seguintes produtos atingiram o nível mínimo de estoque e precisam de reposição:\n\n");
+        conteudo.append("Olá, gestor da ").append(empresa.getNomeFantasia()).append("!\n");
+        conteudo.append("Aqui é o seu assistente SmartStock. Preparei o seu resumo diário de estoque:\n\n");
 
-        for (Produto p : produtos) {
-            conteudo.append("📦 Produto: ").append(p.getNome()).append("\n");
-            conteudo.append("   Estoque Atual: ").append(p.getQuantidade());
-            if(p.getUnidade() != null) conteudo.append(" ").append(p.getUnidade());
+        // --- BLOCO 1: COMPRAR ---
+        if (!criticos.isEmpty()) {
+            conteudo.append("🚨 PRECISAM DE REPOSIÇÃO (Estoque Crítico):\n");
+            for (Produto p : criticos) {
+                conteudo.append(" - ").append(p.getNome())
+                        .append(" (Atual: ").append(p.getQuantidade())
+                        .append(" | Mínimo: ").append(p.getEstoqueMinimo()).append(")\n");
+            }
             conteudo.append("\n");
-            conteudo.append("   Mínimo Exigido: ").append(p.getEstoqueMinimo()).append("\n");
-            conteudo.append("----------------------------------------\n");
         }
 
-        conteudo.append("\nPor favor, acesse o sistema SmartStock para providenciar as compras.");
+        // --- BLOCO 2: VENDER RÁPIDO (PROMOÇÃO) ---
+        if (!vencendo.isEmpty()) {
+            conteudo.append("⚠️ VALIDADE PRÓXIMA (Vencem em menos de 30 dias):\n");
+            for (Lote l : vencendo) {
+                conteudo.append(" - ").append(l.getProduto().getNome())
+                        .append(" (Lote c/ ").append(l.getQuantidade()).append(" un. | Vence em: ")
+                        .append(l.getDataValidade()).append(")\n");
+            }
+            conteudo.append("\n");
+        }
 
-        //  Pega o e-mail real do gestor daquela empresa específica
+        // --- BLOCO 3: ENCALHADOS ---
+        if (!encalhados.isEmpty()) {
+            conteudo.append("🛑 ENCALHADOS (Sem saída há mais de 10 dias):\n");
+            for (Produto p : encalhados) {
+                conteudo.append(" - ").append(p.getNome()).append(" (Parados: ").append(p.getQuantidade()).append(" un.)\n");
+            }
+            conteudo.append("\n");
+        }
+
+        conteudo.append("----------------------------------------\n");
+        conteudo.append("Acesse o sistema para tomar as ações necessárias!\n");
+
         String emailDestino = empresa.getEmailContato();
-
-        // Só tenta enviar se a empresa tiver um e-mail cadastrado
         if (emailDestino != null && !emailDestino.trim().isEmpty()) {
             emailService.sendEmail(
                     emailDestino,
-                    "🚨 SMARTSTOCK: Alerta de Estoque Crítico - " + empresa.getNomeFantasia(),
+                    "📊 Resumo Inteligente SmartStock - " + empresa.getNomeFantasia(),
                     conteudo.toString()
             );
-            System.out.println("📧 E-mail de alerta disparado com sucesso para o gestor: " + emailDestino);
-        } else {
-            System.out.println("⚠️ ALERTA: A empresa " + empresa.getNomeFantasia() + " tem produtos acabando, mas não tem e-mail de contato cadastrado!");
+            System.out.println("📧 E-mail de resumo disparado para: " + emailDestino);
         }
     }
 }

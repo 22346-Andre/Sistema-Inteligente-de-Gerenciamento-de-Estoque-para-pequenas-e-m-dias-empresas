@@ -22,7 +22,6 @@ public class RegistroService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    // O @Transactional garante que se der erro ao criar o usuário, a empresa também não é salva (evita lixo no banco)
     @Transactional
     public String registrarNovaEmpresa(RegistroEmpresaDTO dto) {
         // 1. Verifica se o email já existe
@@ -44,14 +43,16 @@ public class RegistroService {
 
         empresaRepository.save(novaEmpresa); // Salva para gerar o ID
 
-        // 3. Cria o Usuário ADMIN (Dono)
+        // 3. Cria o Usuário ADMIN (Dono) e salva o telefone dele
         Usuario admin = new Usuario();
         admin.setNome(dto.getNomeAdmin());
         admin.setEmail(dto.getEmailAdmin());
         admin.setSenha(passwordEncoder.encode(dto.getSenhaAdmin()));
-
-
         admin.setPerfil("ADMIN");
+
+        // --- SALVANDO O TELEFONE DO ADMIN ---
+        admin.setTelefone(dto.getTelefoneAdmin());
+
         admin.setEmpresa(novaEmpresa);
 
         usuarioRepository.save(admin);

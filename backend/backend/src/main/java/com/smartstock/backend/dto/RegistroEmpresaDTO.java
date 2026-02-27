@@ -28,4 +28,6 @@ public class RegistroEmpresaDTO {
 
     @NotBlank(message = "A senha é obrigatória")
     private String senhaAdmin;
+
+    private String telefoneAdmin;
 }

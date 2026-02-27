@@ -18,7 +18,8 @@ public class UsuarioController {
     @Autowired
     private UsuarioService service;
 
-    // GET - Listar tudo (Aberto para visualização corporativa geral - todos da empresa podem ver)
+
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPER_ADMIN')") //
     @GetMapping
     public List<Usuario> listar() {
         return service.listarTodos();
