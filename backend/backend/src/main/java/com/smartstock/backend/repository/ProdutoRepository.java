@@ -38,4 +38,12 @@ public interface ProdutoRepository extends JpaRepository<Produto, Long>, JpaSpec
     @org.springframework.data.jpa.repository.Query("SELECT p FROM Produto p WHERE p.empresa.id = :empresaId AND p.id NOT IN " +
             "(SELECT m.produto.id FROM Movimentacao m WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataLimite)")
     java.util.List<com.smartstock.backend.model.Produto> findProdutosEncalhados(Long empresaId, java.time.LocalDateTime dataLimite);
+
+    // 1. Busca produtos ordenados do maior valor em stock para o menor (Para Curva ABC)
+    @Query("SELECT p FROM Produto p WHERE p.empresa.id = :empresaId AND p.quantidade > 0 ORDER BY (p.preco * p.quantidade) DESC")
+    List<Produto> findProdutosOrdenadosPorValorTotal(@Param("empresaId") Long empresaId);
+
+    // 2. Soma todas as unidades físicas em stock
+    @Query("SELECT COALESCE(SUM(p.quantidade), 0) FROM Produto p WHERE p.empresa.id = :empresaId")
+    Integer sumQuantidadeTotalEstoque(@Param("empresaId") Long empresaId);
 }
