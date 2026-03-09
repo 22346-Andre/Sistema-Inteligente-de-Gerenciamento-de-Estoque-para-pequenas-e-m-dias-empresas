@@ -36,21 +36,30 @@ public class EstatisticasService {
 
         // 1. CAPITAL IMOBILIZADO
         BigDecimal totalEstoque = produtoRepository.calcularValorTotalEstoque(empresaId);
-        dto.setCapitalImobilizado(totalEstoque);
+        dto.setCapitalImobilizado(totalEstoque != null ? totalEstoque : BigDecimal.ZERO);
 
-        // 2. GIRO DE ESTOQUE (Últimos 30 dias)
-        // Fórmula simplificada: (Total Vendido / Estoque Atual)
+        // 2. GIRO DE ESTOQUE
         LocalDateTime trintaDiasAtras = LocalDateTime.now().minusDays(30);
         Integer totalSaidas = movimentacaoRepository.sumSaidasUltimosDias(empresaId, trintaDiasAtras);
         Integer estoqueAtual = produtoRepository.sumQuantidadeTotalEstoque(empresaId);
+
+        totalSaidas = (totalSaidas != null) ? totalSaidas : 0;
+        estoqueAtual = (estoqueAtual != null) ? estoqueAtual : 0;
 
         double giro = 0.0;
         if (estoqueAtual > 0) {
             giro = (double) totalSaidas / estoqueAtual;
         }
-        dto.setGiroEstoque30Dias(Math.round(giro * 100.0) / 100.0); // Arredonda a 2 casas decimais
+        dto.setGiroEstoque(Math.round(giro * 100.0) / 100.0);
 
-        // 3. CURVA ABC
+        // 3. TOTAIS PARA O DASHBOARD
+        long totalProds = produtoRepository.countByEmpresaId(empresaId);
+        dto.setTotalProdutos(totalProds);
+
+        List<Produto> criticos = produtoRepository.findProdutosComEstoqueBaixoPorEmpresa(empresaId);
+        dto.setProdutosCriticos((long) criticos.size());
+
+        // 4. CURVA ABC
         List<Produto> produtosOrdenados = produtoRepository.findProdutosOrdenadosPorValorTotal(empresaId);
         List<CurvaABCDTO> curvaABC = new ArrayList<>();
         BigDecimal acumulado = BigDecimal.ZERO;
@@ -58,29 +67,29 @@ public class EstatisticasService {
         for (Produto p : produtosOrdenados) {
             CurvaABCDTO item = new CurvaABCDTO();
             item.setNomeProduto(p.getNome());
-            item.setQuantidade(p.getQuantidade());
 
-            BigDecimal valorItem = p.getPreco().multiply(new BigDecimal(p.getQuantidade()));
+            Integer qtd = p.getQuantidade() != null ? p.getQuantidade() : 0;
+            item.setQuantidade(qtd);
+
+            BigDecimal precoCusto = p.getPrecoCusto() != null ? p.getPrecoCusto() : BigDecimal.ZERO;
+            BigDecimal valorItem = precoCusto.multiply(new BigDecimal(qtd));
+
             item.setValorTotal(valorItem);
-
             acumulado = acumulado.add(valorItem);
 
-            // Calcula o percentual acumulado em relação ao capital total
             double percentual = 0.0;
-            if (totalEstoque.compareTo(BigDecimal.ZERO) > 0) {
+            if (totalEstoque != null && totalEstoque.compareTo(BigDecimal.ZERO) > 0) {
                 percentual = acumulado.divide(totalEstoque, 4, RoundingMode.HALF_UP).doubleValue() * 100;
             }
             item.setPercentualAcumulado(Math.round(percentual * 100.0) / 100.0);
 
-            // Classificação ABC
             if (percentual <= 80.0) {
-                item.setClasse("A"); // 80% do capital (Os mais importantes)
+                item.setClasse("A");
             } else if (percentual <= 95.0) {
-                item.setClasse("B"); // Próximos 15%
+                item.setClasse("B");
             } else {
-                item.setClasse("C"); // Últimos 5%
+                item.setClasse("C");
             }
-
             curvaABC.add(item);
         }
 

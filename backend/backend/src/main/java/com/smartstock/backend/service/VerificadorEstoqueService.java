@@ -90,16 +90,18 @@ public class VerificadorEstoqueService {
         }
 
         conteudo.append("----------------------------------------\n");
-        conteudo.append("Acesse o sistema para tomar as ações necessárias!\n");
+        conteudo.append("📦 Em anexo, enviamos a planilha completa em Excel (CSV) com as sugestões de compra já calculadas!\n");
+        conteudo.append("Acesse o sistema para tomar as ações necessárias.\n");
 
         String emailDestino = empresa.getEmailContato();
         if (emailDestino != null && !emailDestino.trim().isEmpty()) {
-            emailService.sendEmail(
+
+            emailService.enviarResumoComPlanilha(
                     emailDestino,
                     "📊 Resumo Inteligente SmartStock - " + empresa.getNomeFantasia(),
-                    conteudo.toString()
+                    conteudo.toString(),
+                    empresa.getId()
             );
-            System.out.println("📧 E-mail de resumo disparado para: " + emailDestino);
         }
     }
 }

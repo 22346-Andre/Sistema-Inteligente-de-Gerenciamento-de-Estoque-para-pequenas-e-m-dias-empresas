@@ -12,7 +12,10 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @Entity
-@Table(name = "produtos")
+//  A trava de segurança agora junta o código E a empresa!
+@Table(name = "produtos", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"codigo_barras", "empresa_id"})
+})
 public class Produto {
 
     @Id
@@ -25,8 +28,15 @@ public class Produto {
     @CsvBindByName(column = "DESCRICAO")
     private String descricao;
 
-    @CsvBindByName(column = "PRECO")
-    private BigDecimal preco;
+    @Column(name = "preco_custo")
+    private BigDecimal precoCusto;
+
+    @Column(name = "preco_venda")
+    private BigDecimal precoVenda;
+
+
+    @Column(name = "codigo_barras")
+    private String codigoBarras;
 
     @CsvBindByName(column = "QUANTIDADE")
     private Integer quantidade;
@@ -47,18 +57,19 @@ public class Produto {
     @Column(name = "data_atualizacao")
     private LocalDateTime dataAtualizacao;
 
-    // (Dono do produto)
     @ManyToOne
     @JoinColumn(name = "empresa_id")
     private Empresa empresa;
 
-    // LISTA DE LOTES
     @OneToMany(mappedBy = "produto", cascade = CascadeType.ALL, orphanRemoval = true)
-
     private List<Lote> lotes = new ArrayList<>();
+
     @ManyToOne
     @JoinColumn(name = "fornecedor_id")
     private Fornecedor fornecedor;
+
+    @Transient
+    private String classificacaoABC;
 
     @PrePersist
     protected void onCreate() {

@@ -1,11 +1,11 @@
 package com.smartstock.backend.controller;
 
+import com.smartstock.backend.dto.MovimentacaoPdvDTO;
 import com.smartstock.backend.model.Movimentacao;
 import com.smartstock.backend.service.MovimentacaoService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -16,10 +16,31 @@ public class MovimentacaoController {
     @Autowired
     private MovimentacaoService service;
 
-    // Rota EXCLUSIVA para o Dashboard e Relatórios lerem o histórico
+    //  Dashboard e Relatórios lerem o histórico
     @GetMapping
     public List<Movimentacao> listar() {
-        // O service já extrai a Empresa do JWT com segurança e traz só o que é dela!
         return service.listarTodas();
+    }
+
+    //
+    @PostMapping("/pdv")
+    public ResponseEntity<?> registrarPDV(@RequestBody MovimentacaoPdvDTO dto) {
+        try {
+            Movimentacao movimentacao = service.registrarViaPDV(dto);
+            return ResponseEntity.ok(movimentacao);
+        } catch (Exception e) {
+            // Se der erro (ex: produto não encontrado ou sem estoque), devolve Erro 400
+            return ResponseEntity.badRequest().body(new MensagemErroDTO(e.getMessage()));
+        }
+    }
+
+    // Classe auxiliar apenas para mandar o erro formatado para o React ler
+    static class MensagemErroDTO {
+        public String message;
+        public MensagemErroDTO(String message) { this.message = message; }
+    }
+    @GetMapping("/produto/{produtoId}")
+    public ResponseEntity<List<Movimentacao>> listarPorProduto(@PathVariable Long produtoId) {
+        return ResponseEntity.ok(service.listarPorProduto(produtoId));
     }
 }

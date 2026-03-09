@@ -10,6 +10,11 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     Optional<Usuario> findByEmail(String email);
 
-    //  Buscar funcionários de uma empresa específica
+    // Buscar funcionários de uma empresa específica
     List<Usuario> findByEmpresaId(Long empresaId);
+
+    // Conta quantos funcionários têm um perfil específico dentro da empresa
+    long countByEmpresaIdAndPerfil(Long empresaId, String perfil);
+
+    Optional<Usuario> findFirstByEmpresaIdOrderByIdAsc(Long empresaId);
 }

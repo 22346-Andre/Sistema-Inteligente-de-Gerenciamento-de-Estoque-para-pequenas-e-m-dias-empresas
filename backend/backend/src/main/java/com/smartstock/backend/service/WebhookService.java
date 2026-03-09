@@ -3,28 +3,24 @@ package com.smartstock.backend.service;
 import com.smartstock.backend.dto.ItemVendaExternaDTO;
 import com.smartstock.backend.dto.VendaExternaDTO;
 import com.smartstock.backend.model.Empresa;
-import com.smartstock.backend.model.Movimentacao;
 import com.smartstock.backend.model.Produto;
-import com.smartstock.backend.model.TipoMovimentacao;
 import com.smartstock.backend.repository.EmpresaRepository;
-import com.smartstock.backend.repository.MovimentacaoRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 
 @Service
 public class WebhookService {
 
     private final ProdutoRepository produtoRepository;
     private final EmpresaRepository empresaRepository;
-    private final MovimentacaoRepository movimentacaoRepository;
 
-    public WebhookService(ProdutoRepository produtoRepository, EmpresaRepository empresaRepository, MovimentacaoRepository movimentacaoRepository) {
+    private final ProdutoService produtoService;
+
+    public WebhookService(ProdutoRepository produtoRepository, EmpresaRepository empresaRepository, ProdutoService produtoService) {
         this.produtoRepository = produtoRepository;
         this.empresaRepository = empresaRepository;
-        this.movimentacaoRepository = movimentacaoRepository;
+        this.produtoService = produtoService;
     }
 
     @Transactional
@@ -38,29 +34,20 @@ public class WebhookService {
             Produto produto = produtoRepository.findById(item.getProdutoId())
                     .orElseThrow(() -> new RuntimeException("Webhook Erro: Produto não encontrado com ID " + item.getProdutoId()));
 
-            // Trava de Segurança: Garante que o produto pertence mesmo à empresa do payload
             if (!produto.getEmpresa().getId().equals(empresa.getId())) {
                 continue;
             }
 
-            // 1. Abate o estoque em tempo real
-            int novaQuantidade = produto.getQuantidade() - item.getQuantidade();
-            produto.setQuantidade(novaQuantidade < 0 ? 0 : novaQuantidade); // Evita estoque negativo bizarro
-            produtoRepository.save(produto);
+            try {
 
-            // 2. Registra o histórico automaticamente (Auditoria)
-            Movimentacao mov = new Movimentacao();
-            mov.setProduto(produto);
-            mov.setEmpresa(empresa);
-            mov.setTipo(TipoMovimentacao.SAIDA);
-            mov.setQuantidade(item.getQuantidade());
-            mov.setDataMovimentacao(LocalDateTime.now());
-            mov.setObservacao("Venda automática via " + dto.getOrigem() + " | Pedido: " + dto.getIdPedido());
-
-            movimentacaoRepository.save(mov);
-            itensProcessados++;
+                // Isso abate dos lotes que vão vencer primeiro e já gera o Histórico sozinho.
+                produtoService.registrarSaida(produto.getId(), item.getQuantidade());
+                itensProcessados++;
+            } catch (Exception e) {
+                System.err.println("Aviso: Falha ao processar item no Webhook: " + e.getMessage());
+            }
         }
 
-        return "Webhook recebido! " + itensProcessados + " itens abatidos no estoque do cliente.";
+        return "Webhook recebido! " + itensProcessados + " itens abatidos no estoque usando algoritmo FEFO.";
     }
 }

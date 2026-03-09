@@ -9,13 +9,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/estatisticas")
+@RequestMapping("/estatisticas")
 public class EstatisticasController {
 
     @Autowired
     private EstatisticasService service;
 
-    // Trancado: Apenas gestores podem aceder a dados financeiros profundos
+    //  Apenas gestores podem aceder a dados financeiros profundos
     @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPER_ADMIN')")
     @GetMapping
     public EstatisticasDTO obterEstatisticas() {

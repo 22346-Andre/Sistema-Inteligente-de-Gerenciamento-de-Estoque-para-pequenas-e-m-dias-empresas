@@ -9,7 +9,11 @@ public class RegistroEmpresaDTO {
 
     // --- DADOS DA EMPRESA ---
     @NotBlank(message = "A Razão Social é obrigatória")
-    private String nomeEmpresa; // Vai ser salvo na Razão Social
+    private String nomeEmpresa;
+
+
+    @NotBlank(message = "O Nome Fantasia é obrigatório")
+    private String nomeFantasia;
 
     @NotBlank(message = "O CNPJ é obrigatório")
     private String cnpj;
@@ -17,6 +21,9 @@ public class RegistroEmpresaDTO {
     @NotBlank(message = "O e-mail de contato da empresa é obrigatório")
     @Email(message = "E-mail de contato inválido")
     private String emailContato;
+
+
+    private String telefoneEmpresa;
 
     // --- DADOS DO DONO (ADMIN) ---
     @NotBlank(message = "O nome do administrador é obrigatório")

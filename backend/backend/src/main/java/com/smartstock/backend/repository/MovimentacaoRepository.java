@@ -25,4 +25,8 @@ public interface MovimentacaoRepository extends JpaRepository<Movimentacao, Long
     // Soma o total de itens vendidos/saídas nos últimos dias (Para o Giro de Estoque)
     @Query("SELECT COALESCE(SUM(m.quantidade), 0) FROM Movimentacao m WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataInicio")
     Integer sumSaidasUltimosDias(@Param("empresaId") Long empresaId, @Param("dataInicio") java.time.LocalDateTime dataInicio);
+
+
+    List<Movimentacao> findByProdutoIdOrderByDataMovimentacaoDesc(Long produtoId);
+
 }

@@ -25,6 +25,11 @@ public class Empresa {
     @Column(name = "email_contato")
     private String emailContato;
 
+    private String telefone;
+    private String endereco;
+    private String cidade;
+    private String estado;
+
 
     private LocalDateTime ultimoAcesso = LocalDateTime.now(); // Já começa com a data de hoje ao criar
 }

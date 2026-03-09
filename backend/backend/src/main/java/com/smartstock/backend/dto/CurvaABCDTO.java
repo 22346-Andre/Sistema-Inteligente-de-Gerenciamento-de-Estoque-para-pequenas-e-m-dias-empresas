@@ -9,5 +9,5 @@ public class CurvaABCDTO {
     private Integer quantidade;
     private BigDecimal valorTotal; // Quantidade * Preço
     private Double percentualAcumulado;
-    private String classe; // 'A', 'B' ou 'C'
+    private String classe;
 }

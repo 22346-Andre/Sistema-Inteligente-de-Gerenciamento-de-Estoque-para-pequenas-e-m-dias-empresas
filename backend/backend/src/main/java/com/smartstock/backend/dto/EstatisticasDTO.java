@@ -7,6 +7,8 @@ import java.util.List;
 @Data
 public class EstatisticasDTO {
     private BigDecimal capitalImobilizado;
-    private Double giroEstoque30Dias; // Taxa de giro do mês
+    private Double giroEstoque;
+    private Long totalProdutos;
+    private Long produtosCriticos;
     private List<CurvaABCDTO> curvaABC;
 }

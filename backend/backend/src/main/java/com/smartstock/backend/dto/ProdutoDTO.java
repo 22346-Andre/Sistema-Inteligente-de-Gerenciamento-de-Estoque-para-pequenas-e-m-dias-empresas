@@ -1,8 +1,8 @@
 package com.smartstock.backend.dto;
 
+import com.opencsv.bean.CsvBindByName;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import java.math.BigDecimal;
 
@@ -10,23 +10,38 @@ import java.math.BigDecimal;
 public class ProdutoDTO {
 
     @NotBlank(message = "O nome é obrigatório")
+    @CsvBindByName(column = "nome")
     private String nome;
 
+    @CsvBindByName(column = "descricao")
     private String descricao;
 
-    @NotNull(message = "O preço é obrigatório")
-    @Min(value = 0, message = "Preço não pode ser negativo")
-    private BigDecimal preco;
+    @CsvBindByName(column = "codigoBarras")
+    private String codigoBarras;
 
-    @NotNull(message = "A quantidade é obrigatória")
-    @Min(value = 0, message = "Quantidade não pode ser negativa")
+    @CsvBindByName(column = "categoria")
+    private String categoria;
+
+    @Min(value = 0, message = "Preço de custo não pode ser negativo")
+    @CsvBindByName(column = "precoCusto")
+    private BigDecimal precoCusto;
+
+    @Min(value = 0, message = "Preço de venda não pode ser negativo")
+    @CsvBindByName(column = "precoVenda")
+    private BigDecimal precoVenda;
+
+    @CsvBindByName(column = "quantidade")
     private Integer quantidade;
 
-    private Integer estoqueMinimo;
+    @CsvBindByName(column = "quantidadeMinima")
+    private Integer quantidadeMinima;
 
+    @CsvBindByName(column = "ncm")
     private String ncm;
+
+    @CsvBindByName(column = "unidade")
     private String unidade;
+
+    @CsvBindByName(column = "fornecedorId")
     private Long fornecedorId;
-
-
 }

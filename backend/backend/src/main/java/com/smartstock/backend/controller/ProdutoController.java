@@ -25,7 +25,14 @@ public class ProdutoController {
         return service.listarTodos();
     }
 
-    // --- A NOSSA NOVA ROTA DE BUSCA AVANÇADA VEM AQUI ---
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Produto> buscarPorId(@PathVariable Long id) {
+        Produto produto = service.buscarPorId(id);
+        return ResponseEntity.ok(produto);
+    }
+
+    // --- A ROTA DE BUSCA AVANÇADA ---
     @GetMapping("/busca-avancada")
     public ResponseEntity<List<Produto>> buscarProdutosAvancado(
             @RequestParam(required = false) String categoria,
@@ -61,6 +68,7 @@ public class ProdutoController {
         service.deletar(id);
         return ResponseEntity.noContent().build();
     }
+
     // Rota 5: ADICIONAR UM NOVO LOTE (ENTRADA DE STOCK)
     @PostMapping("/{id}/lotes")
     public ResponseEntity<Produto> darEntradaLote(@PathVariable Long id, @RequestBody com.smartstock.backend.dto.LoteDTO dto) {
