@@ -9,12 +9,13 @@ import com.smartstock.backend.repository.ProdutoRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @Service
 public class WebhookService {
 
     private final ProdutoRepository produtoRepository;
     private final EmpresaRepository empresaRepository;
-
     private final ProdutoService produtoService;
 
     public WebhookService(ProdutoRepository produtoRepository, EmpresaRepository empresaRepository, ProdutoService produtoService) {
@@ -25,29 +26,36 @@ public class WebhookService {
 
     @Transactional
     public String processarVendaExterna(VendaExternaDTO dto) {
+        // 1. Valida a empresa (Tenant SaaS)
         Empresa empresa = empresaRepository.findById(dto.getEmpresaId())
                 .orElseThrow(() -> new RuntimeException("Webhook Erro: Empresa não encontrada."));
 
         int itensProcessados = 0;
 
+        // 2. Passa por cada item que foi vendido na loja externa
         for (ItemVendaExternaDTO item : dto.getItens()) {
-            Produto produto = produtoRepository.findById(item.getProdutoId())
-                    .orElseThrow(() -> new RuntimeException("Webhook Erro: Produto não encontrado com ID " + item.getProdutoId()));
 
-            if (!produto.getEmpresa().getId().equals(empresa.getId())) {
+            //  Busca o produto usando o Código de Barras e a Empresa
+            Optional<Produto> produtoOpt = produtoRepository.findByCodigoBarrasAndEmpresaId(item.getCodigoBarras(), empresa.getId());
+
+            // Se o vendedor cadastrou na Shopee um produto que não existe no SmartStock, o sistema avisa mas não trava o resto.
+            if (produtoOpt.isEmpty()) {
+
+                System.err.println("Aviso Webhook: Produto com Código '" + item.getCodigoBarras() + "' não encontrado na empresa " + empresa.getNomeFantasia());
                 continue;
             }
 
-            try {
+            Produto produto = produtoOpt.get();
 
-                // Isso abate dos lotes que vão vencer primeiro e já gera o Histórico sozinho.
+            try {
+                // Dá a baixa inteligente (FEFO) nos lotes que vão vencer primeiro
                 produtoService.registrarSaida(produto.getId(), item.getQuantidade());
                 itensProcessados++;
             } catch (Exception e) {
-                System.err.println("Aviso: Falha ao processar item no Webhook: " + e.getMessage());
+                System.err.println("Aviso Webhook: Falha ao baixar estoque do item " + item.getCodigoBarras() + " -> " + e.getMessage());
             }
         }
 
-        return "Webhook recebido! " + itensProcessados + " itens abatidos no estoque usando algoritmo FEFO.";
+        return String.format("Webhook da %s recebido! %d itens abatidos no estoque usando algoritmo FEFO.", dto.getOrigem(), itensProcessados);
     }
 }

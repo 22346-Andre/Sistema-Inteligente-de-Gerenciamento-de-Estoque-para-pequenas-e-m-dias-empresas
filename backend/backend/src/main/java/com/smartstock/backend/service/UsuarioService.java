@@ -1,5 +1,7 @@
 package com.smartstock.backend.service;
 
+import com.smartstock.backend.dto.AlterarSenhaDTO;
+import com.smartstock.backend.dto.AtualizarPerfilDTO;
 import com.smartstock.backend.dto.UsuarioDTO;
 import com.smartstock.backend.model.Usuario;
 import com.smartstock.backend.repository.EmpresaRepository;
@@ -16,6 +18,7 @@ import java.util.Optional;
 @Service
 public class UsuarioService {
 
+
     @Autowired
     private UsuarioRepository repository;
 
@@ -25,6 +28,7 @@ public class UsuarioService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    // --- MÉTODO CENTRAL PARA PEGAR O USUÁRIO LOGADO ---
     private Usuario getUsuarioLogado() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
@@ -100,15 +104,12 @@ public class UsuarioService {
         Usuario usuarioAlvo = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
 
-        //  Busca quem é o dono (O primeiro usuário criado para aquela empresa)
         Usuario donoDaEmpresa = repository.findFirstByEmpresaIdOrderByIdAsc(usuarioAlvo.getEmpresa().getId()).orElse(null);
 
-        //  O Dono da empresa não pode ser editado por aqui
         if (donoDaEmpresa != null && donoDaEmpresa.getId().equals(usuarioAlvo.getId())) {
             throw new RuntimeException("Ação Proibida: A conta do Dono da empresa é protegida e não pode ser editada.");
         }
 
-        //  Um ADMIN comum não pode editar um SUPER_ADMIN do sistema
         if ("SUPER_ADMIN".equals(usuarioAlvo.getPerfil()) && !"SUPER_ADMIN".equals(adminLogado.getPerfil())) {
             throw new RuntimeException("Ação Proibida: Você não tem permissão para editar um Super Administrador.");
         }
@@ -132,15 +133,12 @@ public class UsuarioService {
         Usuario usuarioAlvo = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
 
-        // Busca quem é o dono da empresa
         Usuario donoDaEmpresa = repository.findFirstByEmpresaIdOrderByIdAsc(usuarioAlvo.getEmpresa().getId()).orElse(null);
 
-        // Impedir exclusão APENAS do dono
         if (donoDaEmpresa != null && donoDaEmpresa.getId().equals(usuarioAlvo.getId())) {
             throw new RuntimeException("Ação Bloqueada: O Dono (criador) da empresa não pode ser removido do sistema.");
         }
 
-        //  Impedir exclusão de um SUPER_ADMIN por um usuário normal
         if ("SUPER_ADMIN".equals(usuarioAlvo.getPerfil()) && !"SUPER_ADMIN".equals(adminLogado.getPerfil())) {
             throw new RuntimeException("Ação Bloqueada: Você não tem autoridade para excluir um Super Administrador.");
         }
@@ -154,5 +152,37 @@ public class UsuarioService {
         }
 
         repository.deleteById(id);
+    }
+
+    // ==========================================
+    // 🚨 MÉTODOS DE PERFIL E SENHA (CORRIGIDOS)
+    // ==========================================
+
+    public void atualizarPerfil(AtualizarPerfilDTO dto) {
+        // Usa a função inteligente que criámos lá em cima
+        Usuario usuario = getUsuarioLogado();
+
+        usuario.setNome(dto.getNome());
+
+        // Usa o "repository" minúsculo, que é o nome certo da variável
+        repository.save(usuario);
+    }
+
+    public void alterarSenha(AlterarSenhaDTO dto) {
+        Usuario usuario = getUsuarioLogado();
+
+
+        if (dto.getSenhaAtual().equals(dto.getNovaSenha())) {
+            throw new RuntimeException("Erro: A nova senha não pode ser igual à senha atual.");
+        }
+
+        // Verifica se a senha antiga digitada bate com a que está guardada no banco
+        if (!passwordEncoder.matches(dto.getSenhaAtual(), usuario.getSenha())) {
+            throw new RuntimeException("Erro: A senha atual está incorreta.");
+        }
+
+        // Encripta a nova senha e salva
+        usuario.setSenha(passwordEncoder.encode(dto.getNovaSenha()));
+        repository.save(usuario);
     }
 }
