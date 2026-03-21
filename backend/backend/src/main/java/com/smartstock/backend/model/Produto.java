@@ -8,6 +8,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.CollectionTable;
 
 @Data
 @NoArgsConstructor
@@ -48,6 +50,13 @@ public class Produto {
     @CsvBindByName(column = "NCM")
     private String ncm;
 
+    @Column(name = "cfop")
+    private String cfop;
+
+    @ElementCollection
+    @CollectionTable(name = "produto_impostos", joinColumns = @JoinColumn(name = "produto_id"))
+    private List<Imposto> impostos = new ArrayList<>();
+
     @CsvBindByName(column = "UNIDADE")
     private String unidade;
 
@@ -67,6 +76,9 @@ public class Produto {
     @ManyToOne
     @JoinColumn(name = "fornecedor_id")
     private Fornecedor fornecedor;
+
+    @Column(name = "finalidade_estoque")
+    private String finalidadeEstoque;
 
     @Transient
     private String classificacaoABC;

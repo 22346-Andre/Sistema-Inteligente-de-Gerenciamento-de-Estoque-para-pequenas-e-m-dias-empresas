@@ -40,7 +40,6 @@ public class WebhookService {
 
             // Se o vendedor cadastrou na Shopee um produto que não existe no SmartStock, o sistema avisa mas não trava o resto.
             if (produtoOpt.isEmpty()) {
-
                 System.err.println("Aviso Webhook: Produto com Código '" + item.getCodigoBarras() + "' não encontrado na empresa " + empresa.getNomeFantasia());
                 continue;
             }
@@ -48,8 +47,8 @@ public class WebhookService {
             Produto produto = produtoOpt.get();
 
             try {
-                // Dá a baixa inteligente (FEFO) nos lotes que vão vencer primeiro
-                produtoService.registrarSaida(produto.getId(), item.getQuantidade());
+                
+                produtoService.registrarSaida(produto.getId(), item.getQuantidade(), null, "Venda Externa via Webhook");
                 itensProcessados++;
             } catch (Exception e) {
                 System.err.println("Aviso Webhook: Falha ao baixar estoque do item " + item.getCodigoBarras() + " -> " + e.getMessage());

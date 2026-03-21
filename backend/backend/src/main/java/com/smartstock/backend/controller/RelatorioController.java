@@ -52,4 +52,16 @@ public class RelatorioController {
 
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
+
+
+    @GetMapping("/perdas/pdf")
+    public ResponseEntity<byte[]> descarregarPerdasPdf() {
+        byte[] pdfBytes = relatorioPdfService.gerarRelatorioPerdasPdf();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "relatorio_perdas_smartstock.pdf");
+
+        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+    }
 }

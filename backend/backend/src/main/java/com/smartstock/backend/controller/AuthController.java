@@ -74,7 +74,7 @@ public class AuthController {
         return ResponseEntity.ok(new LoginResponse(jwtValue, expiresIn));
     }
 
-    
+
     @PostMapping("/login/google")
     public ResponseEntity<?> loginComGoogle(@RequestBody GoogleLoginDTO dto) {
         try {

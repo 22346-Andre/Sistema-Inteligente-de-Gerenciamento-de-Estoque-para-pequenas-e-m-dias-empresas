@@ -1,10 +1,12 @@
 package com.smartstock.backend.dto;
 
 import com.opencsv.bean.CsvBindByName;
+import com.smartstock.backend.model.Imposto;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 public class ProdutoDTO {
@@ -39,9 +41,17 @@ public class ProdutoDTO {
     @CsvBindByName(column = "ncm")
     private String ncm;
 
+    @CsvBindByName(column = "cfop")
+    private String cfop;
+
+    private List<Imposto> impostos;
+
     @CsvBindByName(column = "unidade")
     private String unidade;
 
     @CsvBindByName(column = "fornecedorId")
     private Long fornecedorId;
+
+    @CsvBindByName(column = "finalidadeEstoque")
+    private String finalidadeEstoque;
 }

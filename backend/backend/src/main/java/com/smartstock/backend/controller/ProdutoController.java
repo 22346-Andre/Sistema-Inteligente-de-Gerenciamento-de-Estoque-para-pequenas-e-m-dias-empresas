@@ -25,14 +25,12 @@ public class ProdutoController {
         return service.listarTodos();
     }
 
-
     @GetMapping("/{id}")
     public ResponseEntity<Produto> buscarPorId(@PathVariable Long id) {
         Produto produto = service.buscarPorId(id);
         return ResponseEntity.ok(produto);
     }
 
-    // --- A ROTA DE BUSCA AVANÇADA ---
     @GetMapping("/busca-avancada")
     public ResponseEntity<List<Produto>> buscarProdutosAvancado(
             @RequestParam(required = false) String categoria,
@@ -49,37 +47,33 @@ public class ProdutoController {
         return ResponseEntity.ok(service.salvar(dto));
     }
 
-    // Traz apenas os que estão a acabar, filtrado por empresa
     @GetMapping("/criticos")
     public List<Produto> listarEstoqueCritico() {
         return service.listarEstoqueCritico();
     }
 
-    // Rota 3: ATUALIZAR UM PRODUTO (PUT)
     @PutMapping("/{id}")
     public ResponseEntity<Produto> atualizar(@PathVariable Long id, @RequestBody @Valid ProdutoDTO dto) {
         Produto produtoAtualizado = service.atualizar(id, dto);
         return ResponseEntity.ok(produtoAtualizado);
     }
 
-    // Rota 4: APAGAR UM PRODUTO (DELETE)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         service.deletar(id);
         return ResponseEntity.noContent().build();
     }
 
-    // Rota 5: ADICIONAR UM NOVO LOTE (ENTRADA DE STOCK)
     @PostMapping("/{id}/lotes")
     public ResponseEntity<Produto> darEntradaLote(@PathVariable Long id, @RequestBody com.smartstock.backend.dto.LoteDTO dto) {
-        Produto produtoAtualizado = service.adicionarLote(id, dto);
+        Produto produtoAtualizado = service.adicionarLote(id, dto, dto.getNovoPrecoCompra());
         return ResponseEntity.ok(produtoAtualizado);
     }
 
-    // Rota 6: REGISTAR VENDA/BAIXA (SAÍDA DE STOCK COM FEFO)
+
     @PostMapping("/{id}/saida")
     public ResponseEntity<String> registarSaida(@PathVariable Long id, @RequestBody com.smartstock.backend.dto.SaidaDTO dto) {
-        service.registrarSaida(id, dto.getQuantidadeDesejada());
-        return ResponseEntity.ok("Saída de " + dto.getQuantidadeDesejada() + " unidades registada com sucesso! Lotes atualizados via FEFO.");
+        service.registrarSaida(id, dto.getQuantidadeDesejada(), dto.getTipo(), dto.getMotivo());
+        return ResponseEntity.ok("Operação registada com sucesso! Lotes atualizados via FEFO.");
     }
 }

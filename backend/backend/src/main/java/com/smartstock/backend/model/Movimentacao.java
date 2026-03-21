@@ -31,5 +31,5 @@ public class Movimentacao {
     private Empresa empresa;
 
     @Column(length = 255)
-    private String observacao;
+    private String motivo;
 }

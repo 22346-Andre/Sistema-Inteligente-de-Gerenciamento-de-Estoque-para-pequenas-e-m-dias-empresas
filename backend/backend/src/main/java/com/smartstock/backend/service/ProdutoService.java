@@ -35,7 +35,6 @@ public class ProdutoService {
     @Autowired
     private MovimentacaoRepository movimentacaoRepository;
 
-    // --- MÉTODO AUXILIAR PARA NÃO REPETIR CÓDIGO (DRY) ---
     private Long getEmpresaIdLogada() {
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         Long empresaId = jwt.getClaim("empresaId");
@@ -47,28 +46,43 @@ public class ProdutoService {
     }
 
 
-    public List<Produto> listarTodos() {
-        Long empresaId = getEmpresaIdLogada();
-
-        // 1. Busca todos os produtos da empresa
-        List<Produto> produtos = repository.findByEmpresaId(empresaId);
-
-        // 2. Calcula o Capital Imobilizado Total da empresa
-        BigDecimal totalEstoque = repository.calcularValorTotalEstoque(empresaId);
-        if (totalEstoque == null || totalEstoque.compareTo(BigDecimal.ZERO) == 0) {
-            return produtos; // Se o estoque for zero, devolve a lista normal sem classificar
+    private String calcularCfopInterno(TipoMovimentacao tipo, Produto produto) {
+        if (tipo == TipoMovimentacao.QUEBRA_PERDA) {
+            return "5.927"; // Baixa por perecimento/avaria
         }
 
-        // 3. Ordena a lista do mais valioso (Preço Custo * Qtd) para o menos valioso
+        // Verifica se o produto tem Substituição Tributária (ST) no seu CFOP padrão
+        boolean temST = produto.getCfop() != null && produto.getCfop().contains("405");
+
+        // Assumindo operações internas (Maranhão) como padrão para o MVP
+        if (tipo == TipoMovimentacao.ENTRADA) {
+            return temST ? "1.403" : "1.102"; // Compras
+        }
+
+        if (tipo == TipoMovimentacao.SAIDA) {
+            return temST ? "5.405" : "5.102"; // Vendas
+        }
+
+        return "0.000";
+    }
+
+    public List<Produto> listarTodos() {
+        Long empresaId = getEmpresaIdLogada();
+        List<Produto> produtos = repository.findByEmpresaId(empresaId);
+        BigDecimal totalEstoque = repository.calcularValorTotalEstoque(empresaId);
+
+        if (totalEstoque == null || totalEstoque.compareTo(BigDecimal.ZERO) == 0) {
+            return produtos;
+        }
+
         produtos.sort((p1, p2) -> {
             BigDecimal v1 = (p1.getPrecoCusto() != null ? p1.getPrecoCusto() : BigDecimal.ZERO)
                     .multiply(new BigDecimal(p1.getQuantidade() != null ? p1.getQuantidade() : 0));
             BigDecimal v2 = (p2.getPrecoCusto() != null ? p2.getPrecoCusto() : BigDecimal.ZERO)
                     .multiply(new BigDecimal(p2.getQuantidade() != null ? p2.getQuantidade() : 0));
-            return v2.compareTo(v1); // Ordem decrescente
+            return v2.compareTo(v1);
         });
 
-        // 4. Atribui as letras A, B e C
         BigDecimal acumulado = BigDecimal.ZERO;
         for (Produto p : produtos) {
             BigDecimal valorItem = (p.getPrecoCusto() != null ? p.getPrecoCusto() : BigDecimal.ZERO)
@@ -86,9 +100,7 @@ public class ProdutoService {
             }
         }
 
-        // 5. Devolve a lista ordenada alfabeticamente para o painel de produtos ficar organizado
         produtos.sort(Comparator.comparing(Produto::getNome));
-
         return produtos;
     }
 
@@ -96,7 +108,6 @@ public class ProdutoService {
         Produto produto = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Produto não encontrado com o ID: " + id));
 
-        // Trava de segurança SaaS: Garante que ninguém aceda a um produto de outra empresa
         if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
             throw new RuntimeException("Acesso negado: Este produto pertence a outra empresa.");
         }
@@ -119,17 +130,22 @@ public class ProdutoService {
 
         Produto produto = new Produto();
         produto.setNome(dto.getNome());
-
         produto.setCodigoBarras(dto.getCodigoBarras());
         produto.setCategoria(dto.getCategoria());
         produto.setPrecoCusto(dto.getPrecoCusto());
         produto.setPrecoVenda(dto.getPrecoVenda());
-
         produto.setEstoqueMinimo(dto.getQuantidadeMinima() != null ? dto.getQuantidadeMinima() : 5);
         produto.setQuantidade(dto.getQuantidade() != null ? dto.getQuantidade() : 0);
-
         produto.setDescricao(dto.getDescricao());
         produto.setNcm(dto.getNcm());
+        produto.setCfop(dto.getCfop());
+
+        if (dto.getImpostos() != null) {
+            produto.setImpostos(dto.getImpostos());
+        }
+
+        produto.setFinalidadeEstoque(dto.getFinalidadeEstoque() != null ? dto.getFinalidadeEstoque().toUpperCase() : "REVENDA");
+
         produto.setUnidade(dto.getUnidade() != null ? dto.getUnidade().toUpperCase() : "UN");
         produto.setEmpresa(empresa);
 
@@ -157,9 +173,17 @@ public class ProdutoService {
         produto.setPrecoCusto(dto.getPrecoCusto());
         produto.setPrecoVenda(dto.getPrecoVenda());
         produto.setEstoqueMinimo(dto.getQuantidadeMinima() != null ? dto.getQuantidadeMinima() : 5);
-
         produto.setQuantidade(dto.getQuantidade());
         produto.setNcm(dto.getNcm());
+        produto.setCfop(dto.getCfop());
+
+        if (dto.getImpostos() != null) {
+            produto.setImpostos(dto.getImpostos());
+        } else {
+            produto.getImpostos().clear();
+        }
+
+        produto.setFinalidadeEstoque(dto.getFinalidadeEstoque() != null ? dto.getFinalidadeEstoque().toUpperCase() : "REVENDA");
         produto.setUnidade(dto.getUnidade() != null ? dto.getUnidade().toUpperCase() : "UN");
 
         if (dto.getFornecedorId() != null) {
@@ -169,7 +193,6 @@ public class ProdutoService {
             if (!fornecedor.getEmpresa().getId().equals(getEmpresaIdLogada())) {
                 throw new RuntimeException("Acesso negado: Este fornecedor pertence a outra empresa.");
             }
-
             produto.setFornecedor(fornecedor);
         } else {
             produto.setFornecedor(null);
@@ -207,7 +230,7 @@ public class ProdutoService {
     }
 
     @jakarta.transaction.Transactional
-    public void registrarSaida(Long produtoId, Integer quantidadeDesejada) {
+    public void registrarSaida(Long produtoId, Integer quantidadeDesejada, TipoMovimentacao tipo, String motivo) {
 
         Produto produto = repository.findById(produtoId)
                 .orElseThrow(() -> new RuntimeException("Produto não encontrado"));
@@ -239,22 +262,47 @@ public class ProdutoService {
         produto.setQuantidade(produto.getQuantidade() - quantidadeDesejada);
         Produto produtoAtualizado = repository.save(produto);
 
+        // CÁLCULO DO CFOP AUTOMÁTICO
+        TipoMovimentacao tipoFinal = tipo != null ? tipo : TipoMovimentacao.SAIDA;
+        String cfopOperacao = calcularCfopInterno(tipoFinal, produto);
+
         Movimentacao mov = new Movimentacao();
         mov.setProduto(produtoAtualizado);
-        mov.setTipo(TipoMovimentacao.SAIDA);
+        mov.setTipo(tipoFinal);
+
+
+        String motivoFinal = (motivo != null && !motivo.isBlank()) ? motivo : "Operação registrada";
+        mov.setMotivo("[CFOP " + cfopOperacao + "] " + motivoFinal);
+
         mov.setQuantidade(quantidadeDesejada);
         mov.setEmpresa(produtoAtualizado.getEmpresa());
+
         movimentacaoRepository.save(mov);
     }
 
     @jakarta.transaction.Transactional
-    public Produto adicionarLote(Long produtoId, LoteDTO dto) {
+    public Produto adicionarLote(Long produtoId, LoteDTO dto, BigDecimal novoPrecoCompra) {
 
         Produto produto = repository.findById(produtoId)
                 .orElseThrow(() -> new RuntimeException("Produto não encontrado"));
 
         if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
             throw new RuntimeException("Acesso negado: Não pode alterar o estoque de outra empresa.");
+        }
+
+        int quantidadeAtual = produto.getQuantidade() != null ? produto.getQuantidade() : 0;
+        BigDecimal precoCustoAtual = produto.getPrecoCusto() != null ? produto.getPrecoCusto() : BigDecimal.ZERO;
+        int novaQuantidade = dto.getQuantidade();
+
+        if (novoPrecoCompra != null && novoPrecoCompra.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal valorEstoqueAtual = precoCustoAtual.multiply(new BigDecimal(quantidadeAtual));
+            BigDecimal valorNovaCompra = novoPrecoCompra.multiply(new BigDecimal(novaQuantidade));
+
+            BigDecimal somaValores = valorEstoqueAtual.add(valorNovaCompra);
+            int totalItens = quantidadeAtual + novaQuantidade;
+
+            BigDecimal custoMedio = somaValores.divide(new BigDecimal(totalItens), 2, RoundingMode.HALF_UP);
+            produto.setPrecoCusto(custoMedio);
         }
 
         Lote novoLote = new Lote();
@@ -264,21 +312,23 @@ public class ProdutoService {
         novoLote.setProduto(produto);
         loteRepository.save(novoLote);
 
-        int quantidadeAtual = produto.getQuantidade() != null ? produto.getQuantidade() : 0;
-        produto.setQuantidade(quantidadeAtual + dto.getQuantidade());
+        produto.setQuantidade(quantidadeAtual + novaQuantidade);
         Produto produtoAtualizado = repository.save(produto);
+
+        // CÁLCULO DO CFOP DE ENTRADA
+        String cfopOperacao = calcularCfopInterno(TipoMovimentacao.ENTRADA, produto);
 
         Movimentacao mov = new Movimentacao();
         mov.setProduto(produtoAtualizado);
         mov.setTipo(TipoMovimentacao.ENTRADA);
-        mov.setQuantidade(dto.getQuantidade());
+        mov.setQuantidade(novaQuantidade);
         mov.setEmpresa(produtoAtualizado.getEmpresa());
 
-        String obs = "Entrada manual de lote";
+        String obs = "[CFOP " + cfopOperacao + "] Entrada de lote";
         if (dto.getNumeroLote() != null && !dto.getNumeroLote().isEmpty()) {
-            obs += " (Lote: " + dto.getNumeroLote() + ")";
+            obs += " (" + dto.getNumeroLote() + ")";
         }
-        mov.setObservacao(obs);
+        mov.setMotivo(obs);
 
         movimentacaoRepository.save(mov);
 

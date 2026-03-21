@@ -5,6 +5,7 @@ import lombok.Data;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.math.BigDecimal;
 
 @Data
 @Entity
@@ -39,4 +40,5 @@ public class Lote {
             dataEntrada = LocalDateTime.now();
         }
     }
+    private BigDecimal novoPrecoCompra;
 }

@@ -17,4 +17,6 @@ public class MovimentacaoDTO {
     @NotNull(message = "A quantidade é obrigatória")
     @Min(value = 1, message = "A quantidade deve ser pelo menos 1")
     private Integer quantidade;
+
+    private String motivo;
 }
