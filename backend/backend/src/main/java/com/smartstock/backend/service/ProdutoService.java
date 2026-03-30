@@ -230,7 +230,7 @@ public class ProdutoService {
     }
 
     @jakarta.transaction.Transactional
-    public void registrarSaida(Long produtoId, Integer quantidadeDesejada, TipoMovimentacao tipo, String motivo) {
+    public Movimentacao registrarSaida(Long produtoId, Integer quantidadeDesejada, TipoMovimentacao tipo, String motivo, String chaveNotaFiscal) { // 🟢 Adicionamos o 5º parâmetro aqui
 
         Produto produto = repository.findById(produtoId)
                 .orElseThrow(() -> new RuntimeException("Produto não encontrado"));
@@ -270,14 +270,16 @@ public class ProdutoService {
         mov.setProduto(produtoAtualizado);
         mov.setTipo(tipoFinal);
 
-
         String motivoFinal = (motivo != null && !motivo.isBlank()) ? motivo : "Operação registrada";
         mov.setMotivo("[CFOP " + cfopOperacao + "] " + motivoFinal);
 
         mov.setQuantidade(quantidadeDesejada);
         mov.setEmpresa(produtoAtualizado.getEmpresa());
 
-        movimentacaoRepository.save(mov);
+
+        mov.setChaveNotaFiscal(chaveNotaFiscal);
+
+        return movimentacaoRepository.save(mov);
     }
 
     @jakarta.transaction.Transactional

@@ -10,4 +10,5 @@ public class LoteDTO {
     private Integer quantidade;
     private LocalDate dataValidade;
     private BigDecimal novoPrecoCompra;
+    private String chaveNotaFiscal;
 }

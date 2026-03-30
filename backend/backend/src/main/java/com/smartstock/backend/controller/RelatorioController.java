@@ -6,11 +6,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/relatorios")
+@RequestMapping("/relatorios") // 🟢 CORRIGIDO! Removido o "/api"
 public class RelatorioController {
 
     private final RelatorioPdfService relatorioPdfService;
@@ -62,6 +63,42 @@ public class RelatorioController {
         headers.setContentType(MediaType.APPLICATION_PDF);
         headers.setContentDispositionFormData("attachment", "relatorio_perdas_smartstock.pdf");
 
+        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+    }
+
+    @GetMapping("/danfe/{id}/pdf")
+    public ResponseEntity<byte[]> descarregarDanfePdf(@PathVariable("id") Long movimentacaoId) {
+        byte[] pdfBytes = relatorioPdfService.gerarDanfeSimplesPdf(movimentacaoId);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "nf_operacao_" + movimentacaoId + ".pdf");
+
+        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+    }
+    @GetMapping("/cupom/{id}/pdf")
+    public ResponseEntity<byte[]> descarregarCupomPdf(@PathVariable("id") Long movimentacaoId) {
+        byte[] pdfBytes = relatorioPdfService.gerarCupomFiscalPdf(movimentacaoId);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "cupom_operacao_" + movimentacaoId + ".pdf");
+        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+    }
+    @GetMapping("/danfe/lote/{chave}/pdf")
+    public ResponseEntity<byte[]> descarregarDanfeLotePdf(@PathVariable("chave") String chave) {
+        byte[] pdfBytes = relatorioPdfService.gerarDanfeLotePdf(chave);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "nf_completa_" + chave + ".pdf");
+        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+    }
+
+    @GetMapping("/cupom/lote/{chave}/pdf")
+    public ResponseEntity<byte[]> descarregarCupomLotePdf(@PathVariable("chave") String chave) {
+        byte[] pdfBytes = relatorioPdfService.gerarCupomLotePdf(chave);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "cupom_venda_" + chave + ".pdf");
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
 }

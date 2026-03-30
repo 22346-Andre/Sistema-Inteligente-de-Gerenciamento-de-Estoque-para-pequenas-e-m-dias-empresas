@@ -2,9 +2,11 @@ package com.smartstock.backend.repository;
 
 import com.smartstock.backend.model.Movimentacao;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface MovimentacaoRepository extends JpaRepository<Movimentacao, Long> {
@@ -29,4 +31,9 @@ public interface MovimentacaoRepository extends JpaRepository<Movimentacao, Long
 
     List<Movimentacao> findByProdutoIdOrderByDataMovimentacaoDesc(Long produtoId);
 
+    List<Movimentacao> findByChaveNotaFiscal(String chaveNotaFiscal);
+
+    @Modifying
+    @Query("DELETE FROM Movimentacao m WHERE m.dataMovimentacao < :dataLimite")
+    void deleteByDataMovimentacaoBefore(@Param("dataLimite") LocalDateTime dataLimite);
 }

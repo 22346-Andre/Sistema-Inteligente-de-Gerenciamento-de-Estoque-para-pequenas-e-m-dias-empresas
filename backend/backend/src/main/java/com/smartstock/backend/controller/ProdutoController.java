@@ -2,6 +2,7 @@ package com.smartstock.backend.controller;
 
 import com.smartstock.backend.dto.ProdutoDTO;
 import com.smartstock.backend.model.Produto;
+import com.smartstock.backend.model.Movimentacao; // 🟢 Import da Movimentacao adicionado
 import com.smartstock.backend.service.ProdutoService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,8 +73,15 @@ public class ProdutoController {
 
 
     @PostMapping("/{id}/saida")
-    public ResponseEntity<String> registarSaida(@PathVariable Long id, @RequestBody com.smartstock.backend.dto.SaidaDTO dto) {
-        service.registrarSaida(id, dto.getQuantidadeDesejada(), dto.getTipo(), dto.getMotivo());
-        return ResponseEntity.ok("Operação registada com sucesso! Lotes atualizados via FEFO.");
+    public ResponseEntity<Movimentacao> registarSaida(@PathVariable Long id, @RequestBody com.smartstock.backend.dto.SaidaDTO dto) {
+
+        Movimentacao movSalva = service.registrarSaida(
+                id,
+                dto.getQuantidadeDesejada(),
+                dto.getTipo(),
+                dto.getMotivo(),
+                dto.getChaveNotaFiscal()
+        );
+        return ResponseEntity.ok(movSalva);
     }
 }

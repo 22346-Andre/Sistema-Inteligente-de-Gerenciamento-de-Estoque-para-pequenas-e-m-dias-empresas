@@ -32,4 +32,7 @@ public class Movimentacao {
 
     @Column(length = 255)
     private String motivo;
+
+    @Column(length = 44)
+    private String chaveNotaFiscal;
 }

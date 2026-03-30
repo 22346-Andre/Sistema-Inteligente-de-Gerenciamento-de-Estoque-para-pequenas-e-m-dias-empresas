@@ -10,4 +10,5 @@ public class SaidaDTO {
 
     private TipoMovimentacao tipo;
     private String motivo;
+    private String chaveNotaFiscal;
 }
