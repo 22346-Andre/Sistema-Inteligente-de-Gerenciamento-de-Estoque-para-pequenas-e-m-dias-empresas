@@ -20,54 +20,58 @@ public class ImportacaoController {
         this.importacaoService = importacaoService;
     }
 
-    //ROTA 1: Planilhas CSV (Cadastros em massa/Catálogo)
+
     @PostMapping(value = "/produtos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<String> importarEmLote(@RequestParam(value = "ficheiro", required = false) MultipartFile ficheiro,
-                                                 @RequestParam(value = "file", required = false) MultipartFile file) {
-        MultipartFile arquivoParaProcessar = ficheiro != null ? ficheiro : file;
+    public ResponseEntity<?> importarEmLote(
+            @RequestParam(value = "ficheiro", required = false) MultipartFile ficheiro,
+            @RequestParam(value = "file", required = false) MultipartFile file) {
+
+        MultipartFile arquivoParaProcessar = (ficheiro != null) ? ficheiro : file;
+
+        if (arquivoParaProcessar == null || arquivoParaProcessar.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Erro: Nenhum ficheiro foi enviado ou o ficheiro está vazio.");
+        }
 
         try {
-            if (arquivoParaProcessar == null || arquivoParaProcessar.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("O ficheiro está vazio ou não foi enviado corretamente.");
-            }
             String relatorio = importacaoService.processarFicheiro(arquivoParaProcessar);
             return ResponseEntity.ok(relatorio);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Erro ao processar o arquivo CSV: " + e.getMessage());
+                    .body("Erro interno ao processar o CSV: " + e.getMessage());
         }
     }
 
-    // ROTA 2: EXTRAÇÃO VIA XML OFICIAL (SEFAZ/NFe)
-    @PostMapping("/processar-xml")
-    public ResponseEntity<?> processarXmlNotaFiscal(@RequestParam(value = "file", required = false) MultipartFile file,
-                                                    @RequestParam(value = "ficheiro", required = false) MultipartFile ficheiro) {
-        MultipartFile arquivoParaProcessar = file != null ? file : ficheiro;
+    @PostMapping(value = "/xml-direto", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> importarXmlDireto(
+            @RequestParam(value = "ficheiro", required = false) MultipartFile ficheiro,
+            @RequestParam(value = "file", required = false) MultipartFile file) {
+
+        MultipartFile arquivoParaProcessar = ficheiro != null ? ficheiro : file;
 
         if (arquivoParaProcessar == null || arquivoParaProcessar.isEmpty() || !arquivoParaProcessar.getOriginalFilename().toLowerCase().endsWith(".xml")) {
             return ResponseEntity.badRequest().body("Erro: Envie um arquivo XML válido.");
         }
-        try {
-            List<Map<String, Object>> produtosEncontrados = importacaoService.extrairProdutosDoXmlSefaz(arquivoParaProcessar);
-            return ResponseEntity.ok(produtosEncontrados);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Erro ao processar o XML da NF-e: " + e.getMessage());
-        }
-    }
 
-    // ROTA 3: SALVAR NF-e NO BANCO DE DADOS
-    @PostMapping("/salvar")
-    public ResponseEntity<?> salvarProdutosImportados(@RequestBody List<Map<String, Object>> produtosLidos) {
         try {
-            if (produtosLidos == null || produtosLidos.isEmpty()) {
-                return ResponseEntity.badRequest().body("Nenhum produto encontrado para salvar.");
+
+            List<Map<String, Object>> produtosEncontrados = importacaoService.extrairProdutosDoXmlSefaz(arquivoParaProcessar);
+
+            if (produtosEncontrados == null || produtosEncontrados.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Nenhum produto pôde ser extraído deste XML.");
             }
-            importacaoService.salvarProdutosLidos(produtosLidos);
-            return ResponseEntity.ok("Produtos salvos no estoque com sucesso!");
+
+
+            importacaoService.salvarProdutosLidos(produtosEncontrados);
+
+            return ResponseEntity.ok("Sucesso Absoluto! " + produtosEncontrados.size() + " produtos foram lidos e salvos no estoque.");
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Erro ao salvar no banco de dados: " + e.getMessage());
+                    .body("Erro interno ao processar o XML: " + e.getMessage());
         }
     }
 }
