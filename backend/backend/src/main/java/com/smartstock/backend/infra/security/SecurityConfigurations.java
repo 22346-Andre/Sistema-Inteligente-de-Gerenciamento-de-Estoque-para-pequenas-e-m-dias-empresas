@@ -46,6 +46,8 @@ public class SecurityConfigurations {
         http
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
+
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/registrar-empresa").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/webhooks/**").permitAll()
