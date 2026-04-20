@@ -14,8 +14,9 @@ public class FixBancoDados {
     @PostConstruct
     public void criarTabelaFaltando() {
         try {
-            // Isto vai obrigar o Aiven a criar a tabela caso ela não exista!
+            // Adicionamos o "id BIGINT AUTO_INCREMENT PRIMARY KEY" para o Aiven aceitar!
             jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS produto_impostos (" +
+                    "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
                     "produto_id BIGINT NOT NULL, " +
                     "sigla VARCHAR(255), " +
                     "esfera VARCHAR(255), " +
