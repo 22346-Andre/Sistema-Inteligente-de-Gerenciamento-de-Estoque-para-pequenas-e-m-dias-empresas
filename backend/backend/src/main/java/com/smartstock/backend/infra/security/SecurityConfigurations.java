@@ -52,6 +52,7 @@ public class SecurityConfigurations {
                         .requestMatchers(HttpMethod.POST, "/auth/registrar-empresa").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/webhooks/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/login/google").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/wakeup").permitAll()
                         .anyRequest().authenticated())
 
                 .csrf(csrf -> csrf.disable())
