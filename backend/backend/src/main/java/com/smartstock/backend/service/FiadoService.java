@@ -37,12 +37,11 @@ public class FiadoService {
         conta.setDataVencimento(dto.getDataVencimento());
         conta.setStatus(StatusConta.PENDENTE);
 
-
         if (dto.getDataProximaCobranca() != null) {
             conta.setDataProximaCobranca(dto.getDataProximaCobranca()); // O lojista escolheu a data
         } else {
-            // Se o lojista não escolheu, assume 14 dias (2 semanas) a partir da data de vencimento
-            conta.setDataProximaCobranca(dto.getDataVencimento().plusDays(14));
+
+            conta.setDataProximaCobranca(dto.getDataVencimento());
         }
 
         return contaRepository.save(conta);
@@ -57,7 +56,6 @@ public class FiadoService {
         conta.setStatus(StatusConta.PAGO);
         return contaRepository.save(conta);
     }
-
 
     public ContaReceber adiarCobranca(Long id, int diasParaAdiar) {
         ContaReceber conta = contaRepository.findById(id).orElseThrow();
@@ -80,7 +78,6 @@ public class FiadoService {
         return "https://wa.me/" + telefoneLimpo + "?text=" + textoCodificado;
     }
 
-
     public List<ContaReceber> buscarClientesParaCobrar(Long empresaId) {
         LocalDate hoje = LocalDate.now();
         List<StatusConta> statusParaCobrar = Arrays.asList(StatusConta.PENDENTE, StatusConta.ATRASADO);
@@ -88,5 +85,35 @@ public class FiadoService {
         return contaRepository.findByEmpresaIdAndStatusInAndDataProximaCobrancaLessThanEqual(
                 empresaId, statusParaCobrar, hoje
         );
+    }
+
+    public ContaReceber atualizarFiado(Long id, ContaReceberDTO dto, Long empresaId) {
+        ContaReceber conta = contaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Fiado não encontrado!"));
+
+
+        if (!conta.getEmpresa().getId().equals(empresaId)) {
+            throw new RuntimeException("Operação não permitida!");
+        }
+
+
+        conta.setNomeCliente(dto.getNomeCliente());
+        conta.setValor(dto.getValor());
+
+        if (dto.getTelefoneCliente() != null) {
+            conta.setTelefoneCliente(dto.getTelefoneCliente());
+        }
+
+        if (dto.getDescricao() != null) {
+            conta.setDescricao(dto.getDescricao());
+        }
+
+        // Se a data for alterada, ajusta o alerta para a nova data
+        if (dto.getDataVencimento() != null) {
+            conta.setDataVencimento(dto.getDataVencimento());
+            conta.setDataProximaCobranca(dto.getDataVencimento());
+        }
+
+        return contaRepository.save(conta);
     }
 }

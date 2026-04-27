@@ -46,8 +46,6 @@ public class FiadoController {
         return ResponseEntity.ok(fiadoService.marcarComoPago(id));
     }
 
-
-
     @PutMapping("/{id}/adiar")
     public ResponseEntity<ContaReceber> adiar(@PathVariable Long id, @RequestParam(defaultValue = "7") int dias) {
         return ResponseEntity.ok(fiadoService.adiarCobranca(id, dias));
@@ -57,5 +55,13 @@ public class FiadoController {
     public ResponseEntity<Map<String, String>> obterLinkWhatsApp(@PathVariable Long id) {
         String link = fiadoService.gerarLinkCobrancaWhatsApp(id);
         return ResponseEntity.ok(Map.of("linkWhatsApp", link));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ContaReceber> atualizar(@PathVariable Long id, @RequestBody ContaReceberDTO dto) {
+        
+        Long empresaId = getEmpresaIdLogada();
+        ContaReceber atualizado = fiadoService.atualizarFiado(id, dto, empresaId);
+        return ResponseEntity.ok(atualizado);
     }
 }
