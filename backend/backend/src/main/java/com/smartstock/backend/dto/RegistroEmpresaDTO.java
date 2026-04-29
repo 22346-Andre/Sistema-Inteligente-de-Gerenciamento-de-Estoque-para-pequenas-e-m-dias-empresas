@@ -13,18 +13,21 @@ public class RegistroEmpresaDTO {
     @JsonProperty("razaoSocial")
     private String nomeEmpresa;
 
+
     private String nomeFantasia;
 
     @NotBlank(message = "O CNPJ é obrigatório")
     private String cnpj;
 
+
+    @Email(message = "E-mail de contato inválido")
     private String emailContato;
 
     private String telefoneEmpresa;
 
     // --- DADOS DO DONO (ADMIN) ---
     @NotBlank(message = "O nome do administrador é obrigatório")
-    @JsonProperty("nomeDono")
+    @JsonProperty("nomeDono") // 👈 Lê "nomeDono" do React
     private String nomeAdmin;
 
     @Email(message = "E-mail inválido")
