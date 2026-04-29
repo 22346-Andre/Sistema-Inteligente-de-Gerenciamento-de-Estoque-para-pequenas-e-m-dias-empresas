@@ -59,7 +59,7 @@ public class FiadoController {
 
     @PutMapping("/{id}")
     public ResponseEntity<ContaReceber> atualizar(@PathVariable Long id, @RequestBody ContaReceberDTO dto) {
-        
+
         Long empresaId = getEmpresaIdLogada();
         ContaReceber atualizado = fiadoService.atualizarFiado(id, dto, empresaId);
         return ResponseEntity.ok(atualizado);
