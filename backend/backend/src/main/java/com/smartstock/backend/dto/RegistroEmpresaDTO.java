@@ -1,6 +1,5 @@
 package com.smartstock.backend.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
@@ -10,34 +9,27 @@ public class RegistroEmpresaDTO {
 
     // --- DADOS DA EMPRESA ---
     @NotBlank(message = "A Razão Social é obrigatória")
-    @JsonProperty("razaoSocial")
-    private String nomeEmpresa;
-
+    private String razaoSocial;
 
     private String nomeFantasia;
 
     @NotBlank(message = "O CNPJ é obrigatório")
     private String cnpj;
 
-
-    @Email(message = "E-mail de contato inválido")
     private String emailContato;
 
     private String telefoneEmpresa;
 
     // --- DADOS DO DONO (ADMIN) ---
-    @NotBlank(message = "O nome do administrador é obrigatório")
-    @JsonProperty("nomeDono") // 👈 Lê "nomeDono" do React
-    private String nomeAdmin;
+    @NotBlank(message = "O nome do dono é obrigatório")
+    private String nomeDono;
 
     @Email(message = "E-mail inválido")
-    @NotBlank(message = "O e-mail do administrador é obrigatório")
-    @JsonProperty("email")
-    private String emailAdmin;
+    @NotBlank(message = "O e-mail é obrigatório")
+    private String email;
 
     @NotBlank(message = "A senha é obrigatória")
-    @JsonProperty("senha")
-    private String senhaAdmin;
+    private String senha;
 
     private String telefoneAdmin;
 }

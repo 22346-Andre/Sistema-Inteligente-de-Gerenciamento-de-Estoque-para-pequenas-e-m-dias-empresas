@@ -24,7 +24,8 @@ public class RegistroService {
 
     @Transactional
     public String registrarNovaEmpresa(RegistroEmpresaDTO dto) {
-        if (usuarioRepository.findByEmail(dto.getEmailAdmin()).isPresent()) {
+        // Usa o nome atualizado: getEmail()
+        if (usuarioRepository.findByEmail(dto.getEmail()).isPresent()) {
             throw new RuntimeException("Este e-mail já está em uso por outro usuário!");
         }
 
@@ -33,7 +34,8 @@ public class RegistroService {
         }
 
         Empresa novaEmpresa = new Empresa();
-        novaEmpresa.setRazaoSocial(dto.getNomeEmpresa());
+        // Usa o nome atualizado: getRazaoSocial()
+        novaEmpresa.setRazaoSocial(dto.getRazaoSocial());
         novaEmpresa.setCnpj(dto.getCnpj());
         novaEmpresa.setEmailContato(dto.getEmailContato());
         novaEmpresa.setNomeFantasia(dto.getNomeFantasia());
@@ -42,9 +44,12 @@ public class RegistroService {
         empresaRepository.save(novaEmpresa);
 
         Usuario admin = new Usuario();
-        admin.setNome(dto.getNomeAdmin());
-        admin.setEmail(dto.getEmailAdmin());
-        admin.setSenha(passwordEncoder.encode(dto.getSenhaAdmin()));
+        // Usa o nome atualizado: getNomeDono()
+        admin.setNome(dto.getNomeDono());
+        // Usa o nome atualizado: getEmail()
+        admin.setEmail(dto.getEmail());
+        // Usa o nome atualizado: getSenha()
+        admin.setSenha(passwordEncoder.encode(dto.getSenha()));
         admin.setPerfil("ADMIN");
         admin.setTelefone(dto.getTelefoneAdmin());
         admin.setEmpresa(novaEmpresa);

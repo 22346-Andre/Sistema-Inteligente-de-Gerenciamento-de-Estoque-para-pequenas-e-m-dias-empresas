@@ -100,9 +100,7 @@ public class UsuarioController {
         return ResponseEntity.ok(logado);
     }
 
-    // ==========================================
-    // 🚨 NOVAS ROTAS DE PERFIL PESSOAL
-    // ==========================================
+
 
     @PutMapping("/perfil/dados")
     public ResponseEntity<String> atualizarPerfil(@RequestBody AtualizarPerfilDTO dto) {
