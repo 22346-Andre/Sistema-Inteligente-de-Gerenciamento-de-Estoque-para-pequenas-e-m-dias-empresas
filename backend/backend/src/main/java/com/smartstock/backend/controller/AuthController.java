@@ -40,15 +40,11 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
-    // --- ROTA PÚBLICA DE CADASTRO DA EMPRESA E DO DONO ---
+    // --- ROTA PÚblica DE CADASTRO DA EMPRESA E DO DONO ---
     @PostMapping("/registrar-empresa")
     public ResponseEntity<String> registrar(@RequestBody @Valid RegistroEmpresaDTO dto) {
-        try {
-            String mensagem = registroService.registrarNovaEmpresa(dto);
-            return ResponseEntity.ok(mensagem);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+        String mensagem = registroService.registrarNovaEmpresa(dto);
+        return ResponseEntity.ok(mensagem);
     }
 
     // --- ROTA DE LOGIN NORMAL ---
