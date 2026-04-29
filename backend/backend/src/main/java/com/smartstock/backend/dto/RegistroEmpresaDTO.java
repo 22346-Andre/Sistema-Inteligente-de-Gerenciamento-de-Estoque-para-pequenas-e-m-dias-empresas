@@ -18,6 +18,7 @@ public class RegistroEmpresaDTO {
 
     @NotBlank(message = "O CNPJ é obrigatório")
     @ValidCNPJ(message = "O CNPJ informado é inválido")
+    private String cnpj;
 
     private String emailContato;
 
@@ -38,6 +39,11 @@ public class RegistroEmpresaDTO {
     private String senha;
 
     @NotBlank(message = "O celular do administrador é obrigatório")
-    @Size(min = 10, message = "O celular deve ter pelo menos 10 dígitos") 
+    @Size(min = 10, message = "O celular deve ter pelo menos 10 dígitos")
     private String telefoneAdmin;
+
+
+    public String getCnpj() {
+        return this.cnpj;
+    }
 }
