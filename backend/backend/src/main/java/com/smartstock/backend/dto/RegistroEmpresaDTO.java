@@ -1,7 +1,10 @@
 package com.smartstock.backend.dto;
 
+import com.smartstock.backend.exception.ValidCNPJ;
+import com.smartstock.backend.exception.ValidSenha;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
@@ -14,10 +17,12 @@ public class RegistroEmpresaDTO {
     private String nomeFantasia;
 
     @NotBlank(message = "O CNPJ é obrigatório")
-    private String cnpj;
+    @ValidCNPJ(message = "O CNPJ informado é inválido")
 
     private String emailContato;
 
+    @NotBlank(message = "O telefone da empresa é obrigatório")
+    @Size(min = 10, message = "O telefone deve ter pelo menos 10 dígitos")
     private String telefoneEmpresa;
 
     // --- DADOS DO DONO (ADMIN) ---
@@ -29,7 +34,10 @@ public class RegistroEmpresaDTO {
     private String email;
 
     @NotBlank(message = "A senha é obrigatória")
+    @ValidSenha(message = "A senha deve ter no mínimo 6 caracteres")
     private String senha;
 
+    @NotBlank(message = "O celular do administrador é obrigatório")
+    @Size(min = 10, message = "O celular deve ter pelo menos 10 dígitos") 
     private String telefoneAdmin;
 }
