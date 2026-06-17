@@ -95,9 +95,10 @@ public class SecurityConfigurations {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Aqui estão as credenciais VIP para a Vercel passar!
+
         configuration.setAllowedOrigins(Arrays.asList(
                 "https://frontendrepository-ebon.vercel.app",
+                "https://frontendrepository-o4fgcswsg-22346-andres-projects.vercel.app",
                 "http://localhost:5173",
                 "http://localhost:3000"
         ));
