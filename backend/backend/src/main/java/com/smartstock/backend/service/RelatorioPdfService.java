@@ -50,7 +50,7 @@ public class RelatorioPdfService {
                 .orElseThrow(() -> new RuntimeException("Empresa não encontrada no banco de dados."));
     }
 
-    public byte[] gerarBalancoGeralPdf() {
+    public byte[] gerarBalancoGeralPdf(String dataInicio, String dataFim) {
         Empresa empresa = getEmpresaLogada();
         List<Produto> produtosDaEmpresa = produtoRepository.findByEmpresaId(empresa.getId());
 
@@ -125,7 +125,7 @@ public class RelatorioPdfService {
         return out.toByteArray();
     }
 
-    public byte[] gerarRelatorioMovimentacoesPdf() {
+    public byte[] gerarRelatorioMovimentacoesPdf(String dataInicio, String dataFim) {
         Empresa empresa = getEmpresaLogada();
         List<Movimentacao> movimentacoes = movimentacaoRepository.findByEmpresaIdOrderByDataMovimentacaoDesc(empresa.getId());
 
@@ -188,7 +188,7 @@ public class RelatorioPdfService {
         return out.toByteArray();
     }
 
-    public byte[] gerarRelatorioInventarioFiscalPdf() {
+    public byte[] gerarRelatorioInventarioFiscalPdf(String dataInicio, String dataFim) {
         Empresa empresa = getEmpresaLogada();
         List<Produto> produtosDaEmpresa = produtoRepository.findByEmpresaId(empresa.getId());
 
@@ -292,7 +292,7 @@ public class RelatorioPdfService {
         return out.toByteArray();
     }
 
-    public byte[] gerarRelatorioPerdasPdf() {
+    public byte[] gerarRelatorioPerdasPdf(String dataInicio, String dataFim) {
         Empresa empresa = getEmpresaLogada();
 
         List<Movimentacao> perdas = movimentacaoRepository.findByEmpresaIdOrderByDataMovimentacaoDesc(empresa.getId())

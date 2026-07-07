@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -21,9 +22,10 @@ public class RelatorioController {
     }
 
     @GetMapping("/balanco/pdf")
-    public ResponseEntity<byte[]> descarregarBalancoPdf() {
-        // o método não precisa receber o nome, ele usa o JWT do usuário logado!
-        byte[] pdfBytes = relatorioPdfService.gerarBalancoGeralPdf();
+    public ResponseEntity<byte[]> descarregarBalancoPdf(
+            @RequestParam(required = false) String dataInicio,
+            @RequestParam(required = false) String dataFim) {
+        byte[] pdfBytes = relatorioPdfService.gerarBalancoGeralPdf(dataInicio, dataFim);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
@@ -33,8 +35,10 @@ public class RelatorioController {
     }
 
     @GetMapping("/movimentacoes/pdf")
-    public ResponseEntity<byte[]> descarregarMovimentacoesPdf() {
-        byte[] pdfBytes = relatorioPdfService.gerarRelatorioMovimentacoesPdf();
+    public ResponseEntity<byte[]> descarregarMovimentacoesPdf(
+            @RequestParam(required = false) String dataInicio,
+            @RequestParam(required = false) String dataFim) {
+        byte[] pdfBytes = relatorioPdfService.gerarRelatorioMovimentacoesPdf(dataInicio, dataFim);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
@@ -44,8 +48,10 @@ public class RelatorioController {
     }
 
     @GetMapping("/inventario/pdf")
-    public ResponseEntity<byte[]> descarregarInventarioPdf() {
-        byte[] pdfBytes = relatorioPdfService.gerarRelatorioInventarioFiscalPdf();
+    public ResponseEntity<byte[]> descarregarInventarioPdf(
+            @RequestParam(required = false) String dataInicio,
+            @RequestParam(required = false) String dataFim) {
+        byte[] pdfBytes = relatorioPdfService.gerarRelatorioInventarioFiscalPdf(dataInicio, dataFim);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
@@ -56,8 +62,10 @@ public class RelatorioController {
 
 
     @GetMapping("/perdas/pdf")
-    public ResponseEntity<byte[]> descarregarPerdasPdf() {
-        byte[] pdfBytes = relatorioPdfService.gerarRelatorioPerdasPdf();
+    public ResponseEntity<byte[]> descarregarPerdasPdf(
+            @RequestParam(required = false) String dataInicio,
+            @RequestParam(required = false) String dataFim) {
+        byte[] pdfBytes = relatorioPdfService.gerarRelatorioPerdasPdf(dataInicio, dataFim);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
