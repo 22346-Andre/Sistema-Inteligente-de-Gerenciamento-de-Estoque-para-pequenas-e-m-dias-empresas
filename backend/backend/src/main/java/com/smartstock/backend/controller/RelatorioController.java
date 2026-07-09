@@ -109,4 +109,26 @@ public class RelatorioController {
         headers.setContentDispositionFormData("attachment", "cupom_venda_" + chave + ".pdf");
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
+
+    @GetMapping("/produtos-movimentados/pdf")
+    public ResponseEntity<byte[]> descarregarProdutosMaisMovimentadosPdf(
+            @RequestParam(required = false) String dataInicio,
+            @RequestParam(required = false) String dataFim) {
+        byte[] pdfBytes = relatorioPdfService.gerarRelatorioProdutosMaisMovimentadosPdf(dataInicio, dataFim);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "produtos_mais_movimentados_smartstock.pdf");
+        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+    }
+
+    @GetMapping("/estoque-categoria/pdf")
+    public ResponseEntity<byte[]> descarregarEstoqueCategoriaPdf(
+            @RequestParam(required = false) String dataInicio,
+            @RequestParam(required = false) String dataFim) {
+        byte[] pdfBytes = relatorioPdfService.gerarRelatorioEstoqueCategoriaPdf(dataInicio, dataFim);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "estoque_por_categoria_smartstock.pdf");
+        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+    }
 }
