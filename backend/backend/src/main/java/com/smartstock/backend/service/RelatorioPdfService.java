@@ -742,8 +742,9 @@ public class RelatorioPdfService {
         
         // Agrupar por categoria e somar quantidades
         var estoquePorCategoria = produtosDaEmpresa.stream()
+            var estoquePorCategoria = produtosDaEmpresa.stream()
             .collect(Collectors.groupingBy(
-                p -> p.getCategoria() != null ? p.getCategoria().getNome() : "Sem Categoria",
+                p -> (p.getCategoria() != null && !p.getCategoria().trim().isEmpty()) ? p.getCategoria() : "Sem Categoria",
                 Collectors.summingInt(p -> p.getQuantidade() != null ? p.getQuantidade() : 0)
             ))
             .entrySet().stream()
