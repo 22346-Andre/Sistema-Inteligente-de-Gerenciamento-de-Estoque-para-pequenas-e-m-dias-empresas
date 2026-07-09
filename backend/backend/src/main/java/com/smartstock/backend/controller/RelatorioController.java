@@ -131,4 +131,29 @@ public class RelatorioController {
         headers.setContentDispositionFormData("attachment", "estoque_por_categoria_smartstock.pdf");
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
+    //  Retorna JSON para o Gráfico de Produtos Movimentados
+    @GetMapping("/produtos-movimentados/dados")
+    public ResponseEntity<List<Map<String, Object>>> getDadosProdutosMovimentados(
+            @RequestParam(required = false) String dataInicio,
+            @RequestParam(required = false) String dataFim) {
+        
+        // Chame um método do seu service que retorne uma lista de mapas ou DTOs
+        // Exemplo: [{"nome": "Coca-Cola", "quantidade": 50}, ...]
+        List<Map<String, Object>> dados = relatorioDadosService.getProdutosMaisMovimentados(dataInicio, dataFim);
+        
+        return new ResponseEntity<>(dados, HttpStatus.OK);
+    }
+
+    //  Retorna JSON para o Gráfico de Estoque por Categoria
+    @GetMapping("/estoque-categoria/dados")
+    public ResponseEntity<List<Map<String, Object>>> getDadosEstoqueCategoria(
+            @RequestParam(required = false) String dataInicio,
+            @RequestParam(required = false) String dataFim) {
+        
+        // Chame um método do seu service que retorne uma lista de mapas ou DTOs
+        // Exemplo: [{"categoria": "Bebidas", "quantidade": 150}, ...]
+        List<Map<String, Object>> dados = relatorioDadosService.getEstoqueCategoria(dataInicio, dataFim);
+        
+        return new ResponseEntity<>(dados, HttpStatus.OK);
+    }
 }
