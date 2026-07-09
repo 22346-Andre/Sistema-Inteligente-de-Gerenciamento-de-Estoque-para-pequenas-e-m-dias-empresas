@@ -28,8 +28,10 @@ public interface MovimentacaoRepository extends JpaRepository<Movimentacao, Long
     @Query("SELECT COALESCE(SUM(m.quantidade), 0) FROM Movimentacao m WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataInicio")
     Integer sumSaidasUltimosDias(@Param("empresaId") Long empresaId, @Param("dataInicio") java.time.LocalDateTime dataInicio);
 
-
     List<Movimentacao> findByProdutoIdOrderByDataMovimentacaoDesc(Long produtoId);
+
+    // MÉTODO QUE FALTAVA ADICIONADO AQUI:
+    List<Movimentacao> findByProdutoIdAndDataMovimentacaoBetween(Long produtoId, LocalDateTime dataInicio, LocalDateTime dataFim);
 
     List<Movimentacao> findByChaveNotaFiscal(String chaveNotaFiscal);
 
