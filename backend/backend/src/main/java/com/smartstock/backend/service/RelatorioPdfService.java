@@ -68,9 +68,17 @@ public class RelatorioPdfService {
         }
     }
 
-    public byte[] gerarBalancoGeralPdf(String dataInicio, String dataFim) {
+   public byte[] gerarBalancoGeralPdf(String dataInicio, String dataFim) {
         Empresa empresa = getEmpresaLogada();
         List<Produto> produtosDaEmpresa = produtoRepository.findByEmpresaId(empresa.getId());
+
+        // 🟢 Filtro de Datas Aplicado: Só mostra produtos que se movimentaram no período
+        LocalDateTime[] limites = validarEParsearDatas(dataInicio, dataFim);
+        if (limites != null) {
+            produtosDaEmpresa = produtosDaEmpresa.stream()
+                .filter(p -> !movimentacaoRepository.findByProdutoIdAndDataMovimentacaoBetween(p.getId(), limites[0], limites[1]).isEmpty())
+                .collect(Collectors.toList());
+        }
 
         Document document = new Document(PageSize.A4.rotate());
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -80,12 +88,16 @@ public class RelatorioPdfService {
             document.open();
 
             Font fontTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
-            Paragraph titulo = new Paragraph("Balanco Geral de Estoque - " + empresa.getNomeFantasia().toUpperCase(), fontTitulo);
+            Paragraph titulo = new Paragraph("Balanço Geral de Estoque - " + empresa.getNomeFantasia().toUpperCase(), fontTitulo);
             titulo.setAlignment(Element.ALIGN_CENTER);
             document.add(titulo);
 
+            // 🟢 Adicionando o período no topo (subtítulo)
             String dataHora = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"));
-            Paragraph subtitulo = new Paragraph("Gerado em: " + dataHora + "\n\n");
+            String textoPeriodo = (limites != null) 
+                    ? "Período: " + limites[0].format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + " a " + limites[1].format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + "\n"
+                    : "";
+            Paragraph subtitulo = new Paragraph(textoPeriodo + "Gerado em: " + dataHora + "\n\n");
             subtitulo.setAlignment(Element.ALIGN_CENTER);
             document.add(subtitulo);
 
@@ -97,7 +109,7 @@ public class RelatorioPdfService {
             PdfPCell h1 = new PdfPCell(new Phrase("Produto", fontCabecalho));
             PdfPCell h2 = new PdfPCell(new Phrase("Custo (R$)", fontCabecalho));
             PdfPCell h3 = new PdfPCell(new Phrase("Qtd Atual", fontCabecalho));
-            PdfPCell h4 = new PdfPCell(new Phrase("Minimo", fontCabecalho));
+            PdfPCell h4 = new PdfPCell(new Phrase("Mínimo", fontCabecalho));
             PdfPCell h5 = new PdfPCell(new Phrase("Fornecedor / Contato", fontCabecalho));
 
             h1.setBackgroundColor(Color.LIGHT_GRAY);
@@ -211,19 +223,15 @@ public class RelatorioPdfService {
         return out.toByteArray();
     }
 
-    public byte[] gerarRelatorioInventarioFiscalPdf(String dataInicio, String dataFim) {
+   public byte[] gerarRelatorioInventarioFiscalPdf(String dataInicio, String dataFim) {
         Empresa empresa = getEmpresaLogada();
         List<Produto> produtosDaEmpresa = produtoRepository.findByEmpresaId(empresa.getId());
         
-      // Filtro de Datas Aplicado
+        // 🟢 Filtro de Datas Aplicado corretamente: Retém apenas produtos com movimentação no período
         LocalDateTime[] limites = validarEParsearDatas(dataInicio, dataFim);
         if (limites != null) {
             produtosDaEmpresa = produtosDaEmpresa.stream()
-                .map(p -> {
-                    List<Movimentacao> movimentacoes = movimentacaoRepository
-                        .findByProdutoIdAndDataMovimentacaoBetween(p.getId(), limites[0], limites[1]);
-                    return p;
-                })
+                .filter(p -> !movimentacaoRepository.findByProdutoIdAndDataMovimentacaoBetween(p.getId(), limites[0], limites[1]).isEmpty())
                 .collect(Collectors.toList());
         }
 
@@ -234,6 +242,20 @@ public class RelatorioPdfService {
             PdfWriter.getInstance(document, out);
             document.open();
 
+            // 🟢 Título e Subtítulo com o Período no topo da página
+            Font fontTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
+            Paragraph titulo = new Paragraph("Inventário Fiscal de Estoque - " + empresa.getNomeFantasia().toUpperCase(), fontTitulo);
+            titulo.setAlignment(Element.ALIGN_CENTER);
+            document.add(titulo);
+
+            String dataHora = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"));
+            String textoPeriodo = (limites != null) 
+                    ? "Período: " + limites[0].format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + " a " + limites[1].format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + "\n"
+                    : "";
+            Paragraph subtitulo = new Paragraph(textoPeriodo + "Gerado em: " + dataHora + "\n\n");
+            subtitulo.setAlignment(Element.ALIGN_CENTER);
+            document.add(subtitulo);
+
             Font fontCabecalho = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 7);
             Font fontCelulas = FontFactory.getFont(FontFactory.HELVETICA, 7);
 
@@ -241,20 +263,24 @@ public class RelatorioPdfService {
             table.setWidthPercentage(100);
             table.setWidths(new float[]{1.2f, 2.8f, 1f, 2.5f, 0.8f, 0.8f, 1.2f, 1.2f, 1.5f});
 
+            // 🟢 Tabela ajustada para exibir as datas reais em vez de "....."
             PdfPCell cell1 = new PdfPCell(new Phrase("ESTOQUES EXISTENTES EM\n" + empresa.getNomeFantasia().toUpperCase(), fontCabecalho));
             cell1.setColspan(3);
             cell1.setHorizontalAlignment(Element.ALIGN_CENTER);
             cell1.setVerticalAlignment(Element.ALIGN_MIDDLE);
             table.addCell(cell1);
 
-            PdfPCell cell2 = new PdfPCell(new Phrase("DE ....................................................", fontCabecalho));
+            String periodoTabela = (limites != null) 
+                ? "PERÍODO: " + limites[0].format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + " ATÉ " + limites[1].format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                : "POSIÇÃO ATUAL ATÉ " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            PdfPCell cell2 = new PdfPCell(new Phrase(periodoTabela, fontCabecalho));
             cell2.setColspan(3);
             cell2.setHorizontalAlignment(Element.ALIGN_CENTER);
             cell2.setVerticalAlignment(Element.ALIGN_MIDDLE);
             table.addCell(cell2);
 
             String ano = String.valueOf(LocalDateTime.now().getYear());
-            PdfPCell cell3 = new PdfPCell(new Phrase("DE " + ano, fontCabecalho));
+            PdfPCell cell3 = new PdfPCell(new Phrase("EXERCÍCIO DE " + ano, fontCabecalho));
             cell3.setColspan(3);
             cell3.setHorizontalAlignment(Element.ALIGN_CENTER);
             cell3.setVerticalAlignment(Element.ALIGN_MIDDLE);
