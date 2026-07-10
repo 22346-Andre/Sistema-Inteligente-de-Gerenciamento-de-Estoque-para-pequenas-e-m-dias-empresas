@@ -52,6 +52,21 @@ public class RelatorioPdfService {
         return empresaRepository.findById(empresaId)
                 .orElseThrow(() -> new RuntimeException("Empresa não encontrada no banco de dados."));
     }
+    private LocalDateTime[] validarEParsearDatas(String dataInicio, String dataFim) {
+        if (dataInicio == null || dataInicio.trim().isEmpty() || dataFim == null || dataFim.trim().isEmpty()) {
+            return null; 
+        }
+        try {
+            LocalDateTime inicio = LocalDateTime.parse(dataInicio + "T00:00:00");
+            LocalDateTime fim = LocalDateTime.parse(dataFim + "T23:59:59");
+            if (inicio.isAfter(fim)) {
+                throw new IllegalArgumentException("A data final deve ser maior ou igual à data inicial.");
+            }
+            return new LocalDateTime[]{inicio, fim};
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new IllegalArgumentException("Data inválida. Verifique se o dia existe no mês e ano selecionados.");
+        }
+    }
 
     public byte[] gerarBalancoGeralPdf(String dataInicio, String dataFim) {
         Empresa empresa = getEmpresaLogada();
@@ -131,7 +146,12 @@ public class RelatorioPdfService {
     public byte[] gerarRelatorioMovimentacoesPdf(String dataInicio, String dataFim) {
         Empresa empresa = getEmpresaLogada();
         List<Movimentacao> movimentacoes = movimentacaoRepository.findByEmpresaIdOrderByDataMovimentacaoDesc(empresa.getId());
-
+        LocalDateTime[] limites = validarEParsearDatas(dataInicio, dataFim);
+        if (limites != null) {
+            movimentacoes = movimentacoes.stream()
+                .filter(m -> m.getDataMovimentacao() != null && !m.getDataMovimentacao().isBefore(limites[0]) && !m.getDataMovimentacao().isAfter(limites[1]))
+                .collect(Collectors.toList());
+        }
         Document document = new Document(PageSize.A4);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
 
@@ -195,26 +215,16 @@ public class RelatorioPdfService {
         Empresa empresa = getEmpresaLogada();
         List<Produto> produtosDaEmpresa = produtoRepository.findByEmpresaId(empresa.getId());
         
-        // Filtrar por período: apenas produtos com movimentações no período ou sem movimentações
-        if (dataInicio != null && !dataInicio.isEmpty() && dataFim != null && !dataFim.isEmpty()) {
-            try {
-                LocalDateTime inicio = LocalDateTime.parse(dataInicio + "T00:00:00");
-                LocalDateTime fim = LocalDateTime.parse(dataFim + "T23:59:59");
-                
-                // Recalcular estoque histórico até dataFim
-                produtosDaEmpresa = produtosDaEmpresa.stream()
-                    .map(p -> {
-                        List<Movimentacao> movimentacoes = movimentacaoRepository
-                            .findByProdutoIdAndDataMovimentacaoBetween(p.getId(), inicio, fim);
-                        
-                        // Se não há movimentações no período, manter quantidade atual
-                        // Se há movimentações, recalcular estoque até fim do período
-                        return p;
-                    })
-                    .collect(Collectors.toList());
-            } catch (Exception e) {
-                // Se houver erro na parsing, usar todos os produtos
-            }
+      // Filtro de Datas Aplicado
+        LocalDateTime[] limites = validarEParsearDatas(dataInicio, dataFim);
+        if (limites != null) {
+            produtosDaEmpresa = produtosDaEmpresa.stream()
+                .map(p -> {
+                    List<Movimentacao> movimentacoes = movimentacaoRepository
+                        .findByProdutoIdAndDataMovimentacaoBetween(p.getId(), limites[0], limites[1]);
+                    return p;
+                })
+                .collect(Collectors.toList());
         }
 
         Document document = new Document(PageSize.A4.rotate());
@@ -324,6 +334,12 @@ public class RelatorioPdfService {
                 .stream()
                 .filter(m -> m.getTipo() == TipoMovimentacao.QUEBRA_PERDA)
                 .collect(Collectors.toList());
+        LocalDateTime[] limites = validarEParsearDatas(dataInicio, dataFim);
+        if (limites != null) {
+            perdas = perdas.stream()
+                .filter(m -> m.getDataMovimentacao() != null && !m.getDataMovimentacao().isBefore(limites[0]) && !m.getDataMovimentacao().isAfter(limites[1]))
+                .collect(Collectors.toList());
+        }
 
         Document document = new Document(PageSize.A4);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -662,7 +678,7 @@ public class RelatorioPdfService {
 
 
     // ═══════════════════════════════════════════════════════════════════════════════
-    // NOVOS RELATÓRIOS COM GRÁFICOS
+    //  RELATÓRIOS COM GRÁFICOS
     // ═══════════════════════════════════════════════════════════════════════════════
 
     public byte[] gerarRelatorioProdutosMaisMovimentadosPdf(String dataInicio, String dataFim) {
@@ -671,17 +687,12 @@ public class RelatorioPdfService {
         // Buscar movimentações no período
         List<Movimentacao> movimentacoes = movimentacaoRepository.findByEmpresaIdOrderByDataMovimentacaoDesc(empresa.getId());
         
-        // Filtrar por período se fornecido
-        if (dataInicio != null && !dataInicio.isEmpty() && dataFim != null && !dataFim.isEmpty()) {
-            try {
-                LocalDateTime inicio = LocalDateTime.parse(dataInicio + "T00:00:00");
-                LocalDateTime fim = LocalDateTime.parse(dataFim + "T23:59:59");
-                movimentacoes = movimentacoes.stream()
-                    .filter(m -> m.getDataMovimentacao().isAfter(inicio) && m.getDataMovimentacao().isBefore(fim))
-                    .collect(Collectors.toList());
-            } catch (Exception e) {
-                // Usar todas as movimentações se houver erro
-            }
+        //  Filtro de Datas Aplicado
+        LocalDateTime[] limites = validarEParsearDatas(dataInicio, dataFim);
+        if (limites != null) {
+            movimentacoes = movimentacoes.stream()
+                .filter(m -> m.getDataMovimentacao() != null && !m.getDataMovimentacao().isBefore(limites[0]) && !m.getDataMovimentacao().isAfter(limites[1]))
+                .collect(Collectors.toList());
         }
         
         // Agrupar por produto e contar movimentações
@@ -814,16 +825,13 @@ public class RelatorioPdfService {
         Empresa empresa = getEmpresaLogada();
         List<Movimentacao> movimentacoes = movimentacaoRepository.findByEmpresaIdOrderByDataMovimentacaoDesc(empresa.getId());
 
-        if (dataInicio != null && !dataInicio.isEmpty() && dataFim != null && !dataFim.isEmpty()) {
-            try {
-                LocalDateTime inicio = LocalDateTime.parse(dataInicio + "T00:00:00");
-                LocalDateTime fim = LocalDateTime.parse(dataFim + "T23:59:59");
-                movimentacoes = movimentacoes.stream()
-                        .filter(m -> m.getDataMovimentacao().isAfter(inicio) && m.getDataMovimentacao().isBefore(fim))
-                        .collect(Collectors.toList());
-            } catch (Exception e) {}
+       // Filtro de Datas Aplicado
+        LocalDateTime[] limites = validarEParsearDatas(dataInicio, dataFim);
+        if (limites != null) {
+            movimentacoes = movimentacoes.stream()
+                .filter(m -> m.getDataMovimentacao() != null && !m.getDataMovimentacao().isBefore(limites[0]) && !m.getDataMovimentacao().isAfter(limites[1]))
+                .collect(Collectors.toList());
         }
-
         Map<String, Long> contagem = movimentacoes.stream()
                 .filter(m -> m.getProduto() != null && m.getProduto().getNome() != null)
                 .collect(Collectors.groupingBy(
