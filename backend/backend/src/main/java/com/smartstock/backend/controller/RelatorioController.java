@@ -1,5 +1,6 @@
 package com.smartstock.backend.controller;
 
+import com.smartstock.backend.service.RelatorioDadosService; 
 import com.smartstock.backend.service.RelatorioPdfService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
 import java.util.List;
 import java.util.Map;
 
@@ -18,9 +20,14 @@ import java.util.Map;
 public class RelatorioController {
 
     private final RelatorioPdfService relatorioPdfService;
+    
+    
+    private final RelatorioDadosService relatorioDadosService;
 
-    public RelatorioController(RelatorioPdfService relatorioPdfService) {
+  
+    public RelatorioController(RelatorioPdfService relatorioPdfService, RelatorioDadosService relatorioDadosService) {
         this.relatorioPdfService = relatorioPdfService;
+        this.relatorioDadosService = relatorioDadosService;
     }
 
     @GetMapping("/balanco/pdf")
@@ -133,6 +140,7 @@ public class RelatorioController {
         headers.setContentDispositionFormData("attachment", "estoque_por_categoria_smartstock.pdf");
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
+    
     //  Retorna JSON para o Gráfico de Produtos Movimentados
     @GetMapping("/produtos-movimentados/dados")
     public ResponseEntity<List<Map<String, Object>>> getDadosProdutosMovimentados(
