@@ -26,6 +26,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Service
 public class RelatorioPdfService {
 
@@ -804,5 +807,61 @@ public class RelatorioPdfService {
             e.printStackTrace();
         }
         return out.toByteArray();
+    }
+
+    // 📊 Retorna os dados para o gráfico de Produtos Mais Movimentados (JSON)
+    public List<Map<String, Object>> getProdutosMaisMovimentados(String dataInicio, String dataFim) {
+        Empresa empresa = getEmpresaLogada();
+        List<Movimentacao> movimentacoes = movimentacaoRepository.findByEmpresaIdOrderByDataMovimentacaoDesc(empresa.getId());
+
+        if (dataInicio != null && !dataInicio.isEmpty() && dataFim != null && !dataFim.isEmpty()) {
+            try {
+                LocalDateTime inicio = LocalDateTime.parse(dataInicio + "T00:00:00");
+                LocalDateTime fim = LocalDateTime.parse(dataFim + "T23:59:59");
+                movimentacoes = movimentacoes.stream()
+                        .filter(m -> m.getDataMovimentacao().isAfter(inicio) && m.getDataMovimentacao().isBefore(fim))
+                        .collect(Collectors.toList());
+            } catch (Exception e) {}
+        }
+
+        Map<String, Long> contagem = movimentacoes.stream()
+                .filter(m -> m.getProduto() != null && m.getProduto().getNome() != null)
+                .collect(Collectors.groupingBy(
+                        m -> m.getProduto().getNome(),
+                        Collectors.counting()
+                ));
+
+        return contagem.entrySet().stream()
+                .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
+                .limit(15)
+                .map(entry -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("nome", entry.getKey());
+                    map.put("quantidade", entry.getValue());
+                    return map;
+                })
+                .collect(Collectors.toList());
+    }
+
+    // 📊 Retorna os dados para o gráfico de Estoque por Categoria (JSON)
+    public List<Map<String, Object>> getEstoqueCategoria(String dataInicio, String dataFim) {
+        Empresa empresa = getEmpresaLogada();
+        List<Produto> produtosDaEmpresa = produtoRepository.findByEmpresaId(empresa.getId());
+
+        Map<String, Integer> estoquePorCategoria = produtosDaEmpresa.stream()
+                .collect(Collectors.groupingBy(
+                        p -> (p.getCategoria() != null && !p.getCategoria().trim().isEmpty()) ? p.getCategoria() : "Sem Categoria",
+                        Collectors.summingInt(p -> p.getQuantidade() != null ? p.getQuantidade() : 0)
+                ));
+
+        return estoquePorCategoria.entrySet().stream()
+                .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue()))
+                .map(entry -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("categoria", entry.getKey());
+                    map.put("quantidade", entry.getValue());
+                    return map;
+                })
+                .collect(Collectors.toList());
     }
 }
