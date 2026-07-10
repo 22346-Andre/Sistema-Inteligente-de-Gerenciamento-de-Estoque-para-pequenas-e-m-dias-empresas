@@ -1,6 +1,5 @@
 package com.smartstock.backend.controller;
 
-import com.smartstock.backend.service.RelatorioDadosService; 
 import com.smartstock.backend.service.RelatorioPdfService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -20,14 +19,9 @@ import java.util.Map;
 public class RelatorioController {
 
     private final RelatorioPdfService relatorioPdfService;
-    
-    
-    private final RelatorioDadosService relatorioDadosService;
 
-  
-    public RelatorioController(RelatorioPdfService relatorioPdfService, RelatorioDadosService relatorioDadosService) {
+    public RelatorioController(RelatorioPdfService relatorioPdfService) {
         this.relatorioPdfService = relatorioPdfService;
-        this.relatorioDadosService = relatorioDadosService;
     }
 
     @GetMapping("/balanco/pdf")
@@ -69,7 +63,6 @@ public class RelatorioController {
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
 
-
     @GetMapping("/perdas/pdf")
     public ResponseEntity<byte[]> descarregarPerdasPdf(
             @RequestParam(required = false) String dataInicio,
@@ -93,6 +86,7 @@ public class RelatorioController {
 
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
+
     @GetMapping("/cupom/{id}/pdf")
     public ResponseEntity<byte[]> descarregarCupomPdf(@PathVariable("id") Long movimentacaoId) {
         byte[] pdfBytes = relatorioPdfService.gerarCupomFiscalPdf(movimentacaoId);
@@ -101,6 +95,7 @@ public class RelatorioController {
         headers.setContentDispositionFormData("attachment", "cupom_operacao_" + movimentacaoId + ".pdf");
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
+
     @GetMapping("/danfe/lote/{chave}/pdf")
     public ResponseEntity<byte[]> descarregarDanfeLotePdf(@PathVariable("chave") String chave) {
         byte[] pdfBytes = relatorioPdfService.gerarDanfeLotePdf(chave);
@@ -147,9 +142,7 @@ public class RelatorioController {
             @RequestParam(required = false) String dataInicio,
             @RequestParam(required = false) String dataFim) {
         
-        // Chame um método do seu service que retorne uma lista de mapas ou DTOs
-        // Exemplo: [{"nome": "Coca-Cola", "quantidade": 50}, ...]
-        List<Map<String, Object>> dados = relatorioDadosService.getProdutosMaisMovimentados(dataInicio, dataFim);
+        List<Map<String, Object>> dados = relatorioPdfService.getProdutosMaisMovimentados(dataInicio, dataFim);
         
         return new ResponseEntity<>(dados, HttpStatus.OK);
     }
@@ -160,9 +153,7 @@ public class RelatorioController {
             @RequestParam(required = false) String dataInicio,
             @RequestParam(required = false) String dataFim) {
         
-        // Chame um método do seu service que retorne uma lista de mapas ou DTOs
-        // Exemplo: [{"categoria": "Bebidas", "quantidade": 150}, ...]
-        List<Map<String, Object>> dados = relatorioDadosService.getEstoqueCategoria(dataInicio, dataFim);
+        List<Map<String, Object>> dados = relatorioPdfService.getEstoqueCategoria(dataInicio, dataFim);
         
         return new ResponseEntity<>(dados, HttpStatus.OK);
     }
