@@ -7,10 +7,13 @@ import com.smartstock.backend.dto.ProdutoDTO;
 import com.smartstock.backend.model.Empresa;
 import com.smartstock.backend.model.Fornecedor;
 import com.smartstock.backend.model.Lote;
+import com.smartstock.backend.model.Movimentacao;
 import com.smartstock.backend.model.Produto;
+import com.smartstock.backend.model.TipoMovimentacao;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.FornecedorRepository;
 import com.smartstock.backend.repository.LoteRepository;
+import com.smartstock.backend.repository.MovimentacaoRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -42,15 +45,18 @@ public class ImportacaoService {
     private final EmpresaRepository empresaRepository;
     private final LoteRepository loteRepository;
     private final FornecedorRepository fornecedorRepository;
+    private final MovimentacaoRepository movimentacaoRepository;
 
     public ImportacaoService(ProdutoRepository produtoRepository,
                              EmpresaRepository empresaRepository,
                              LoteRepository loteRepository,
-                             FornecedorRepository fornecedorRepository) {
+                             FornecedorRepository fornecedorRepository,
+                             MovimentacaoRepository movimentacaoRepository) {
         this.produtoRepository = produtoRepository;
         this.empresaRepository = empresaRepository;
         this.loteRepository = loteRepository;
         this.fornecedorRepository = fornecedorRepository;
+        this.movimentacaoRepository = movimentacaoRepository;
     }
 
     private Long getEmpresaIdLogada() {
@@ -115,7 +121,10 @@ public class ImportacaoService {
                 Produto pSalvo = produtoRepository.save(pBase);
                 produtosAtualizados.add(pSalvo);
 
-                if (quantidadeLida > 0) criarLoteInicial(pSalvo, quantidadeLida);
+                if (quantidadeLida > 0) {
+                    criarLoteInicial(pSalvo, quantidadeLida);
+                    registrarMovimentacaoImportacao(pSalvo, empresaLogada, quantidadeLida, "Entrada via importação de CSV");
+                }
 
             } else {
                 Produto pNovo = new Produto();
@@ -139,7 +148,10 @@ public class ImportacaoService {
                 produtosNovos.add(pSalvo);
                 nomesAdicionados.add(pSalvo.getNome());
 
-                if (quantidadeLida > 0) criarLoteInicial(pSalvo, quantidadeLida);
+                if (quantidadeLida > 0) {
+                    criarLoteInicial(pSalvo, quantidadeLida);
+                    registrarMovimentacaoImportacao(pSalvo, empresaLogada, quantidadeLida, "Estoque inicial - Importação de CSV");
+                }
             }
         }
 
@@ -264,7 +276,10 @@ public class ImportacaoService {
                     p.setNcm(ncm);
                 }
                 Produto pSalvo = produtoRepository.save(p);
-                if (quantidade > 0) criarLoteInicial(pSalvo, quantidade);
+                if (quantidade > 0) {
+                    criarLoteInicial(pSalvo, quantidade);
+                    registrarMovimentacaoImportacao(pSalvo, empresaLogada, quantidade, "Entrada via importação de XML NFe");
+                }
 
             } else {
                 Produto pNovo = new Produto();
@@ -281,7 +296,10 @@ public class ImportacaoService {
                 pNovo.setEmpresa(empresaLogada);
 
                 Produto pSalvo = produtoRepository.save(pNovo);
-                if (quantidade > 0) criarLoteInicial(pSalvo, quantidade);
+                if (quantidade > 0) {
+                    criarLoteInicial(pSalvo, quantidade);
+                    registrarMovimentacaoImportacao(pSalvo, empresaLogada, quantidade, "Estoque inicial - Importação de XML NFe");
+                }
             }
         }
     }
@@ -292,5 +310,16 @@ public class ImportacaoService {
         lote.setQuantidade(quantidade);
         lote.setDataValidade(LocalDate.now().plusYears(1));
         loteRepository.save(lote);
+    }
+
+    
+    private void registrarMovimentacaoImportacao(Produto produto, Empresa empresa, Integer quantidade, String motivo) {
+        Movimentacao mov = new Movimentacao();
+        mov.setProduto(produto);
+        mov.setEmpresa(empresa);
+        mov.setTipo(TipoMovimentacao.ENTRADA);
+        mov.setQuantidade(quantidade);
+        mov.setMotivo(motivo);
+        movimentacaoRepository.save(mov);
     }
 }
