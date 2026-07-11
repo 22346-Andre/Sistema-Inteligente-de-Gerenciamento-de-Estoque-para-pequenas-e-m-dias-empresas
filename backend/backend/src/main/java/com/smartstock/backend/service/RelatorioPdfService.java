@@ -118,6 +118,14 @@ public class RelatorioPdfService {
                 // Descobre a quantidade exata no passado
                 if (limites != null) {
                     LocalDateTime dataCorte = limites[1];
+
+                    // Se o produto foi cadastrado DEPOIS da data de corte, ele ainda não
+                    // existia no sistema naquela data — não faz sentido tentar reconstruir
+                    // uma quantidade retroativa para ele. Pula direto.
+                    if (p.getDataCriacao() != null && p.getDataCriacao().isAfter(dataCorte)) {
+                        continue;
+                    }
+
                     List<Movimentacao> movsFuturas = movimentacaoRepository.findByProdutoIdAndDataMovimentacaoBetween(p.getId(), dataCorte.plusSeconds(1), LocalDateTime.now());
                     
                     for (Movimentacao m : movsFuturas) {
@@ -300,6 +308,14 @@ public class RelatorioPdfService {
                 // CÁLCULO RETROATIVO
                 if (limites != null) {
                     LocalDateTime dataCorte = limites[1];
+
+                    // Se o produto foi cadastrado DEPOIS da data de corte, ele ainda não
+                    // existia no sistema naquela data — não faz sentido tentar reconstruir
+                    // uma quantidade retroativa para ele. Pula direto.
+                    if (p.getDataCriacao() != null && p.getDataCriacao().isAfter(dataCorte)) {
+                        continue;
+                    }
+
                     List<Movimentacao> movsFuturas = movimentacaoRepository.findByProdutoIdAndDataMovimentacaoBetween(p.getId(), dataCorte.plusSeconds(1), LocalDateTime.now());
                     
                     for (Movimentacao m : movsFuturas) {
