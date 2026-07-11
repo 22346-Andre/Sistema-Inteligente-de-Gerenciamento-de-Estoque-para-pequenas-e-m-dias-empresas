@@ -66,10 +66,7 @@ public class Produto {
     @Column(name = "data_atualizacao")
     private LocalDateTime dataAtualizacao;
 
-    // Data em que o produto foi efetivamente cadastrado no sistema.
-    // Diferente de dataAtualizacao, esse campo NUNCA é sobrescrito depois de criado,
-    // pois é usado pelos relatórios (Balanço Geral / Inventário Fiscal) para saber
-    // se o produto já existia em uma determinada data retroativa.
+
     @Column(name = "data_criacao", updatable = false)
     private LocalDateTime dataCriacao;
 
