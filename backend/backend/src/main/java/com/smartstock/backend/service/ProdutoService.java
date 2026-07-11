@@ -119,6 +119,7 @@ public class ProdutoService {
         return repository.findProdutosComEstoqueBaixoPorEmpresa(getEmpresaIdLogada());
     }
 
+    @jakarta.transaction.Transactional
     public Produto salvar(ProdutoDTO dto) {
         if (repository.existsByNome(dto.getNome())) {
             throw new RuntimeException("Erro: O produto '" + dto.getNome() + "' já existe no sistema!");
@@ -135,7 +136,10 @@ public class ProdutoService {
         produto.setPrecoCusto(dto.getPrecoCusto());
         produto.setPrecoVenda(dto.getPrecoVenda());
         produto.setEstoqueMinimo(dto.getQuantidadeMinima() != null ? dto.getQuantidadeMinima() : 5);
-        produto.setQuantidade(dto.getQuantidade() != null ? dto.getQuantidade() : 0);
+
+        Integer quantidadeInicial = dto.getQuantidade() != null ? dto.getQuantidade() : 0;
+        produto.setQuantidade(quantidadeInicial);
+
         produto.setDescricao(dto.getDescricao());
         produto.setNcm(dto.getNcm());
         produto.setCfop(dto.getCfop());
@@ -155,7 +159,23 @@ public class ProdutoService {
             produto.setFornecedor(fornecedor);
         }
 
-        return repository.save(produto);
+        Produto produtoSalvo = repository.save(produto);
+
+ 
+        if (quantidadeInicial > 0) {
+            String cfopOperacao = calcularCfopInterno(TipoMovimentacao.ENTRADA, produtoSalvo);
+
+            Movimentacao movInicial = new Movimentacao();
+            movInicial.setProduto(produtoSalvo);
+            movInicial.setTipo(TipoMovimentacao.ENTRADA);
+            movInicial.setQuantidade(quantidadeInicial);
+            movInicial.setEmpresa(empresa);
+            movInicial.setMotivo("[CFOP " + cfopOperacao + "] Estoque inicial de cadastro");
+
+            movimentacaoRepository.save(movInicial);
+        }
+
+        return produtoSalvo;
     }
 
     public Produto atualizar(Long id, ProdutoDTO dto) {
