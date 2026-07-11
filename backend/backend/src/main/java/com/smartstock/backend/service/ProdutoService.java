@@ -161,7 +161,11 @@ public class ProdutoService {
 
         Produto produtoSalvo = repository.save(produto);
 
- 
+        // Gera o rastro (movimentação de ENTRADA) do estoque inicial de cadastro.
+        // Isso garante que os relatórios retroativos (Balanço Geral / Inventário
+        // Fiscal) consigam reconstruir corretamente a quantidade em qualquer data,
+        // sem depender só do campo data_criacao — cada unidade em estoque agora
+        // tem uma movimentação real que explica de onde ela veio.
         if (quantidadeInicial > 0) {
             String cfopOperacao = calcularCfopInterno(TipoMovimentacao.ENTRADA, produtoSalvo);
 
@@ -178,6 +182,7 @@ public class ProdutoService {
         return produtoSalvo;
     }
 
+    @jakarta.transaction.Transactional
     public Produto atualizar(Long id, ProdutoDTO dto) {
         Produto produto = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Produto não encontrado com o ID: " + id));
@@ -185,6 +190,8 @@ public class ProdutoService {
         if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
             throw new RuntimeException("Acesso negado: Você não pode alterar um produto de outra empresa.");
         }
+
+        Integer quantidadeAntes = produto.getQuantidade() != null ? produto.getQuantidade() : 0;
 
         produto.setNome(dto.getNome());
         produto.setDescricao(dto.getDescricao());
@@ -218,7 +225,32 @@ public class ProdutoService {
             produto.setFornecedor(null);
         }
 
-        return repository.save(produto);
+        Produto produtoAtualizado = repository.save(produto);
+
+        // Se a edição mudou a quantidade em estoque, registra a diferença como
+        // movimentação (ENTRADA ou SAIDA), para manter o rastro completo usado
+        // pelos relatórios retroativos (Balanço Geral / Inventário Fiscal).
+        Integer quantidadeDepois = dto.getQuantidade() != null ? dto.getQuantidade() : quantidadeAntes;
+        int diferenca = quantidadeDepois - quantidadeAntes;
+
+        if (diferenca != 0) {
+            Movimentacao ajuste = new Movimentacao();
+            ajuste.setProduto(produtoAtualizado);
+            ajuste.setEmpresa(produtoAtualizado.getEmpresa());
+            ajuste.setMotivo("Ajuste manual via edição de produto");
+
+            if (diferenca > 0) {
+                ajuste.setTipo(TipoMovimentacao.ENTRADA);
+                ajuste.setQuantidade(diferenca);
+            } else {
+                ajuste.setTipo(TipoMovimentacao.SAIDA);
+                ajuste.setQuantidade(Math.abs(diferenca));
+            }
+
+            movimentacaoRepository.save(ajuste);
+        }
+
+        return produtoAtualizado;
     }
 
     public void deletar(Long id) {
