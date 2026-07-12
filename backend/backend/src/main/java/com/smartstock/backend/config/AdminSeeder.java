@@ -5,6 +5,7 @@ import com.smartstock.backend.model.Usuario;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -20,6 +21,10 @@ public class AdminSeeder implements CommandLineRunner {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    //  Puxa a senha parametrizada do application.properties
+    @Value("${admin.default.password}")
+    private String senhaAdmin;
 
     @Override
     public void run(String... args) throws Exception {
@@ -41,7 +46,10 @@ public class AdminSeeder implements CommandLineRunner {
             Usuario superAdmin = new Usuario();
             superAdmin.setNome("Suporte Master (André)");
             superAdmin.setEmail("admin@smartstock.com.br");
-            superAdmin.setSenha(passwordEncoder.encode("Andre123"));
+            
+            //  Usa a variável segura em vez da senha hardcoded
+            superAdmin.setSenha(passwordEncoder.encode(senhaAdmin)); 
+            
             superAdmin.setPerfil("SUPER_ADMIN");
             superAdmin.setEmpresa(hq); // Vincula à Empresa HQ
 
