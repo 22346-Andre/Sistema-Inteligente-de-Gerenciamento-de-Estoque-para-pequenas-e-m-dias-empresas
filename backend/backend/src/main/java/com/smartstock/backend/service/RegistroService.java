@@ -53,6 +53,7 @@ public class RegistroService {
         admin.setPerfil("ADMIN");
         admin.setTelefone(dto.getTelefoneAdmin());
         admin.setEmpresa(novaEmpresa);
+        admin.setDono(true); // Este é o único momento em que "dono" é marcado como true.
 
         usuarioRepository.save(admin);
 
