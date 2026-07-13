@@ -30,6 +30,9 @@ public interface MovimentacaoRepository extends JpaRepository<Movimentacao, Long
 
     List<Movimentacao> findByProdutoIdOrderByDataMovimentacaoDesc(Long produtoId);
 
+    // Usado para checar se um produto tem histórico antes de permitir excluí-lo
+    boolean existsByProdutoId(Long produtoId);
+
     // MÉTODO QUE FALTAVA ADICIONADO AQUI:
     List<Movimentacao> findByProdutoIdAndDataMovimentacaoBetween(Long produtoId, LocalDateTime dataInicio, LocalDateTime dataFim);
 
