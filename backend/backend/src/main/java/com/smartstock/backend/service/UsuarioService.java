@@ -104,9 +104,7 @@ public class UsuarioService {
         Usuario usuarioAlvo = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
 
-        Usuario donoDaEmpresa = repository.findFirstByEmpresaIdOrderByIdAsc(usuarioAlvo.getEmpresa().getId()).orElse(null);
-
-        if (donoDaEmpresa != null && donoDaEmpresa.getId().equals(usuarioAlvo.getId())) {
+        if (usuarioAlvo.isDono()) {
             throw new RuntimeException("Ação Proibida: A conta do Dono da empresa é protegida e não pode ser editada.");
         }
 
@@ -118,6 +116,14 @@ public class UsuarioService {
             if (!usuarioAlvo.getEmpresa().getId().equals(adminLogado.getEmpresa().getId())) {
                 throw new RuntimeException("Acesso negado: Empresa divergente.");
             }
+        }
+
+        // Ninguém pode reduzir o próprio nível de acesso por esta rota (evita
+        // autoexclusão acidental de permissões que travaria a própria conta).
+        if (adminLogado.getId().equals(usuarioAlvo.getId())
+                && dto.getPerfil() != null
+                && !dto.getPerfil().equals(usuarioAlvo.getPerfil())) {
+            throw new RuntimeException("Você não pode alterar o seu próprio cargo. Peça a outro administrador.");
         }
 
         usuarioAlvo.setNome(dto.getNome());
@@ -133,9 +139,7 @@ public class UsuarioService {
         Usuario usuarioAlvo = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
 
-        Usuario donoDaEmpresa = repository.findFirstByEmpresaIdOrderByIdAsc(usuarioAlvo.getEmpresa().getId()).orElse(null);
-
-        if (donoDaEmpresa != null && donoDaEmpresa.getId().equals(usuarioAlvo.getId())) {
+        if (usuarioAlvo.isDono()) {
             throw new RuntimeException("Ação Bloqueada: O Dono (criador) da empresa não pode ser removido do sistema.");
         }
 
@@ -155,7 +159,7 @@ public class UsuarioService {
     }
 
     // ==========================================
-    // 🚨 MÉTODOS DE PERFIL E SENHA (CORRIGIDOS)
+    // 🚨 MÉTODOS DE PERFIL E SENHA 
     // ==========================================
 
     public void atualizarPerfil(AtualizarPerfilDTO dto) {
