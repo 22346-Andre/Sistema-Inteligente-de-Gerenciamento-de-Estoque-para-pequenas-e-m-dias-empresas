@@ -261,6 +261,14 @@ public class ProdutoService {
             throw new RuntimeException("Acesso negado: Você não pode deletar um produto de outra empresa.");
         }
 
+        
+        if (movimentacaoRepository.existsByProdutoId(id)) {
+            throw new RuntimeException(
+                "Não é possível excluir este produto porque ele já possui movimentações de estoque registradas. " +
+                "Se ele não deve mais aparecer no seu catálogo, considere zerar a quantidade em vez de excluí-lo."
+            );
+        }
+
         repository.deleteById(id);
     }
 
