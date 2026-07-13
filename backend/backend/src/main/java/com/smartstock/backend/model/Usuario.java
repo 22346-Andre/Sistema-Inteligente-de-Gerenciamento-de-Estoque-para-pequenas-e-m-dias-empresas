@@ -38,6 +38,10 @@ public class Usuario implements UserDetails {
     @Column(name = "telefone")
     private String telefone;
 
+    
+    @Column(name = "dono", nullable = false)
+    private boolean dono = false;
+
     public boolean isLoginCorrect(LoginRequest loginRequest, PasswordEncoder passwordEncoder) {
         return passwordEncoder.matches(loginRequest.senha(), this.senha);
     }
