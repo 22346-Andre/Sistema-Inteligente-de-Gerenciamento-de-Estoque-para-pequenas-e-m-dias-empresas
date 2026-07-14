@@ -16,6 +16,9 @@ public interface FornecedorRepository extends JpaRepository<Fornecedor, Long> {
     // Verifica se A EMPRESA LOGADA já cadastrou esse CNPJ
     Optional<Fornecedor> findByCnpjAndEmpresaId(String cnpj, Long empresaId);
 
+    
+    Optional<Fornecedor> findByIdAndEmpresaId(Long id, Long empresaId);
+
     // Conta quantos fornecedores a empresa tem
     long countByEmpresaId(Long empresaId);
 }

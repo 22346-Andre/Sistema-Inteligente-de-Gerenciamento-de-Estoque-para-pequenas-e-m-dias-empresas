@@ -46,6 +46,18 @@ public class ProdutoDTO {
 
     private List<Imposto> impostos;
 
+    @CsvBindByName(column = "icms")
+    private BigDecimal icms;
+
+    @CsvBindByName(column = "ipi")
+    private BigDecimal ipi;
+
+    @CsvBindByName(column = "pis")
+    private BigDecimal pis;
+
+    @CsvBindByName(column = "cofins")
+    private BigDecimal cofins;
+
     @CsvBindByName(column = "unidade")
     private String unidade;
 

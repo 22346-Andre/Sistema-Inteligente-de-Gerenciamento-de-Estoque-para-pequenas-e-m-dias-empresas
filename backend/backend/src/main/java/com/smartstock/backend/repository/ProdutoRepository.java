@@ -52,4 +52,7 @@ public interface ProdutoRepository extends JpaRepository<Produto, Long>, JpaSpec
     // Busca produto pelo código de barras E que pertença à empresa logada
     Optional<Produto> findByCodigoBarrasAndEmpresaId(String codigoBarras, Long empresaId);
 
+    // Busca EM LOTE por vários códigos de barras de uma vez (evita 1 query por linha do CSV/XML)
+    List<Produto> findByCodigoBarrasInAndEmpresaId(List<String> codigosBarras, Long empresaId);
+
 }
