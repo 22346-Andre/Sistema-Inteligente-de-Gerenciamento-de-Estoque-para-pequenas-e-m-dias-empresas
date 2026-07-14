@@ -33,6 +33,11 @@
              pelo Java 25 (1.18.40+), o que fazia o @Data não gerar
              getters/setters e quebrar a compilação com "cannot find symbol". -->
         <lombok.version>1.18.46</lombok.version>
+        <!-- A partir do Java 23, o javac deixou de rodar annotation
+             processors automaticamente. Sem isso, o Lombok não processa
+             @Data/@Getter/@Setter e a compilação falha com "cannot find symbol",
+             mesmo com a versão correta do Lombok. -->
+        <maven.compiler.proc>full</maven.compiler.proc>
     </properties>
     <dependencies>
         <dependency>
@@ -132,6 +137,7 @@
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
