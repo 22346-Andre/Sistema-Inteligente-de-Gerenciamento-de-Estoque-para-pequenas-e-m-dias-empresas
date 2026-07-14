@@ -28,6 +28,11 @@
     </scm>
     <properties>
         <java.version>25</java.version>
+        <!-- Fixado explicitamente: a versão de Lombok herdada do
+             spring-boot-starter-parent 3.5.9 é anterior à mínima exigida
+             pelo Java 25 (1.18.40+), o que fazia o @Data não gerar
+             getters/setters e quebrar a compilação com "cannot find symbol". -->
+        <lombok.version>1.18.46</lombok.version>
     </properties>
     <dependencies>
         <dependency>
