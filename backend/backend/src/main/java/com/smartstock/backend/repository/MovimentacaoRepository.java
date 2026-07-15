@@ -41,4 +41,10 @@ public interface MovimentacaoRepository extends JpaRepository<Movimentacao, Long
     @Modifying
     @Query("DELETE FROM Movimentacao m WHERE m.dataMovimentacao < :dataLimite")
     void deleteByDataMovimentacaoBefore(@Param("dataLimite") LocalDateTime dataLimite);
+
+    // Soma as SAÍDAS de UM produto específico nos últimos N dias (giro de vendas para o fuzzy)
+@Query("SELECT COALESCE(SUM(m.quantidade), 0) FROM Movimentacao m " +
+       "WHERE m.produto.id = :produtoId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataInicio")
+Integer sumSaidasPorProdutoUltimosDias(@Param("produtoId") Long produtoId,
+                                       @Param("dataInicio") LocalDateTime dataInicio);
 }

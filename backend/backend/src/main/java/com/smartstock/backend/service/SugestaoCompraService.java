@@ -2,6 +2,7 @@ package com.smartstock.backend.service;
 
 import com.smartstock.backend.dto.SugestaoCompraDTO;
 import com.smartstock.backend.model.Produto;
+import com.smartstock.backend.repository.MovimentacaoRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -9,16 +10,24 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Service
 public class SugestaoCompraService {
 
+    private static final int PRAZO_ENTREGA_PADRAO_DIAS = 7; // fallback enquanto Fornecedor não tiver o campo
+
     @Autowired
     private ProdutoRepository produtoRepository;
 
-    //  Garante que o robô não tente roubar um login que não existe
+    @Autowired
+    private MovimentacaoRepository movimentacaoRepository;
+
+    @Autowired
+    private FuzzyUrgenciaService fuzzyUrgenciaService;
+
     private Long getEmpresaIdLogada() {
         if (SecurityContextHolder.getContext().getAuthentication() == null ||
                 !(SecurityContextHolder.getContext().getAuthentication().getPrincipal() instanceof Jwt)) {
@@ -28,17 +37,32 @@ public class SugestaoCompraService {
         return jwt.getClaim("empresaId");
     }
 
-    // 1. Usado pela Tela (React) - Puxa do Login
     public List<SugestaoCompraDTO> listarSugestoes() {
         return listarSugestoesPorEmpresa(getEmpresaIdLogada());
     }
 
-    // 2. Usado pelo Robô Automático - Puxa do ID que o robô mandar
     public List<SugestaoCompraDTO> listarSugestoesPorEmpresa(Long empresaId) {
         List<Produto> produtosCriticos = produtoRepository.findProdutosComEstoqueBaixoPorEmpresa(empresaId);
         List<SugestaoCompraDTO> sugestoes = new ArrayList<>();
+        LocalDateTime dataInicio = LocalDateTime.now().minusDays(30);
 
         for (Produto p : produtosCriticos) {
+            int atual = p.getQuantidade() != null ? p.getQuantidade() : 0;
+            int minimo = p.getEstoqueMinimo() != null ? p.getEstoqueMinimo() : 0;
+
+            // --- Entradas do fuzzy ---
+            double nivelEstoquePct = minimo > 0 ? ((double) atual / minimo) * 100.0 : 0.0;
+
+            Integer saidas30dias = movimentacaoRepository.sumSaidasPorProdutoUltimosDias(p.getId(), dataInicio);
+            double giroVendas = saidas30dias != null ? saidas30dias : 0.0;
+
+            Integer prazoFornecedor = (p.getFornecedor() != null) ? p.getFornecedor().getPrazoEntregaDias() : null;
+            double prazoEntregaDias = prazoFornecedor != null ? prazoFornecedor : PRAZO_ENTREGA_PADRAO_DIAS;
+
+            // --- Avaliação fuzzy ---
+            double grauUrgencia = fuzzyUrgenciaService.calcularUrgencia(nivelEstoquePct, giroVendas, prazoEntregaDias);
+
+            // --- Monta o DTO ---
             SugestaoCompraDTO dto = new SugestaoCompraDTO();
             dto.setProdutoId(p.getId());
             dto.setNomeProduto(p.getNome());
@@ -48,45 +72,46 @@ public class SugestaoCompraService {
                             ? p.getFornecedor().getTelefone()
                             : ""
             );
-
-            int atual = p.getQuantidade() != null ? p.getQuantidade() : 0;
-            int minimo = p.getEstoqueMinimo() != null ? p.getEstoqueMinimo() : 0;
-
             dto.setQuantidadeAtual(atual);
             dto.setEstoqueMinimo(minimo);
+            dto.setGrauUrgencia(Math.round(grauUrgencia * 10.0) / 10.0); // 1 casa decimal
 
+            // Estoque zerado é sempre URGENTE, independente do fuzzy (regra de negócio dura)
+            dto.setUrgencia(atual == 0 ? "URGENTE" : (grauUrgencia >= 55 ? "URGENTE" : "ATENCAO"));
+
+            // --- Quantidade sugerida: base (repor até margem de segurança) + ajuste pela urgência ---
             int margemSeguranca = (int) Math.ceil(minimo * 0.5);
             int alvo = minimo + margemSeguranca;
-            int quantidadeComprar = alvo - atual;
-            if (quantidadeComprar <= 0) quantidadeComprar = 1;
-
-            dto.setQuantidadeSugerida(quantidadeComprar);
+            int quantidadeBase = Math.max(alvo - atual, 1);
+            int ajusteUrgencia = (int) Math.round((grauUrgencia / 100.0) * minimo * 0.3); // até +30% do mínimo em casos críticos
+            dto.setQuantidadeSugerida(quantidadeBase + ajusteUrgencia);
 
             BigDecimal custo = p.getPrecoCusto() != null ? p.getPrecoCusto() : BigDecimal.ZERO;
             dto.setValorUnitario(custo);
-            dto.setValorTotal(custo.multiply(new BigDecimal(quantidadeComprar)));
-
-            dto.setUrgencia(atual == 0 ? "URGENTE" : "ATENCAO");
+            dto.setValorTotal(custo.multiply(new BigDecimal(dto.getQuantidadeSugerida())));
 
             sugestoes.add(dto);
         }
+
+        // Agora ordena pela urgência fuzzy real, não só por um enum fixo
+        sugestoes.sort((s1, s2) -> Double.compare(s2.getGrauUrgencia(), s1.getGrauUrgencia()));
+
         return sugestoes;
     }
 
-    // Usado pela Tela
     public byte[] gerarPlanilhaCsv() {
         return gerarPlanilhaCsvPorEmpresa(getEmpresaIdLogada());
     }
 
-    // Usado pelo Robô
     public byte[] gerarPlanilhaCsvPorEmpresa(Long empresaId) {
         List<SugestaoCompraDTO> sugestoes = listarSugestoesPorEmpresa(empresaId);
         StringBuilder csv = new StringBuilder();
 
-        csv.append("URGENCIA;PRODUTO;FORNECEDOR;QTD_ATUAL;ESTOQUE_MINIMO;QTD_COMPRAR;VALOR_UNITARIO;VALOR_TOTAL\n");
+        csv.append("URGENCIA;GRAU_URGENCIA;PRODUTO;FORNECEDOR;QTD_ATUAL;ESTOQUE_MINIMO;QTD_COMPRAR;VALOR_UNITARIO;VALOR_TOTAL\n");
 
         for (SugestaoCompraDTO s : sugestoes) {
             csv.append(s.getUrgencia()).append(";")
+                    .append(String.valueOf(s.getGrauUrgencia()).replace(".", ",")).append(";")
                     .append(s.getNomeProduto()).append(";")
                     .append(s.getNomeFornecedor()).append(";")
                     .append(s.getQuantidadeAtual()).append(";")

@@ -15,7 +15,6 @@ public class Fornecedor {
     @Column(nullable = false)
     private String nome;
 
-
     @Column(nullable = false)
     private String cnpj;
 
@@ -23,7 +22,8 @@ public class Fornecedor {
     private String email;
     private String endereco;
 
-
+    @Column(name = "prazo_entrega_dias")
+    private Integer prazoEntregaDias; 
     @ManyToOne
     @JoinColumn(name = "empresa_id", nullable = false)
     private Empresa empresa;

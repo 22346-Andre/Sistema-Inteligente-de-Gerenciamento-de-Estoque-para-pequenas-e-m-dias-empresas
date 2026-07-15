@@ -37,53 +37,51 @@ public class FornecedorService {
     }
 
     public Fornecedor salvar(FornecedorDTO dto) {
-        Long empresaId = getEmpresaIdLogada();
+    Long empresaId = getEmpresaIdLogada();
 
-        // Verifica duplicidade apenas dentro da própria empresa
-        if (repository.findByCnpjAndEmpresaId(dto.getCnpj(), empresaId).isPresent()) {
-            throw new RuntimeException("Você já possui um fornecedor cadastrado com este CNPJ!");
-        }
-
-        Empresa empresa = empresaRepository.findById(empresaId)
-                .orElseThrow(() -> new RuntimeException("Empresa não encontrada"));
-
-        Fornecedor fornecedor = new Fornecedor();
-        fornecedor.setNome(dto.getNome());
-        fornecedor.setCnpj(dto.getCnpj());
-        fornecedor.setTelefone(dto.getTelefone());
-        fornecedor.setEmail(dto.getEmail());
-        fornecedor.setEndereco(dto.getEndereco());
-        fornecedor.setEmpresa(empresa);
-
-        return repository.save(fornecedor);
+    if (repository.findByCnpjAndEmpresaId(dto.getCnpj(), empresaId).isPresent()) {
+        throw new RuntimeException("Você já possui um fornecedor cadastrado com este CNPJ!");
     }
 
-    public Fornecedor atualizar(Long id, FornecedorDTO dto) {
-        Fornecedor fornecedor = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado"));
+    Empresa empresa = empresaRepository.findById(empresaId)
+            .orElseThrow(() -> new RuntimeException("Empresa não encontrada"));
 
-        // TRAVA DE SEGURANÇA SAAS
-        if (!fornecedor.getEmpresa().getId().equals(getEmpresaIdLogada())) {
-            throw new RuntimeException("Acesso negado: Este fornecedor pertence a outra empresa.");
-        }
+    Fornecedor fornecedor = new Fornecedor();
+    fornecedor.setNome(dto.getNome());
+    fornecedor.setCnpj(dto.getCnpj());
+    fornecedor.setTelefone(dto.getTelefone());
+    fornecedor.setEmail(dto.getEmail());
+    fornecedor.setEndereco(dto.getEndereco());
+    fornecedor.setPrazoEntregaDias(dto.getPrazoEntregaDias()); // NOVO
+    fornecedor.setEmpresa(empresa);
 
-        // Verifica se ele não está tentando mudar para um CNPJ que já existe (excluindo ele mesmo)
-        repository.findByCnpjAndEmpresaId(dto.getCnpj(), getEmpresaIdLogada())
-                .ifPresent(existente -> {
-                    if (!existente.getId().equals(id)) {
-                        throw new RuntimeException("Já existe outro fornecedor com este CNPJ.");
-                    }
-                });
+    return repository.save(fornecedor);
+}
 
-        fornecedor.setNome(dto.getNome());
-        fornecedor.setCnpj(dto.getCnpj());
-        fornecedor.setTelefone(dto.getTelefone());
-        fornecedor.setEmail(dto.getEmail());
-        fornecedor.setEndereco(dto.getEndereco());
+public Fornecedor atualizar(Long id, FornecedorDTO dto) {
+    Fornecedor fornecedor = repository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado"));
 
-        return repository.save(fornecedor);
+    if (!fornecedor.getEmpresa().getId().equals(getEmpresaIdLogada())) {
+        throw new RuntimeException("Acesso negado: Este fornecedor pertence a outra empresa.");
     }
 
+    repository.findByCnpjAndEmpresaId(dto.getCnpj(), getEmpresaIdLogada())
+            .ifPresent(existente -> {
+                if (!existente.getId().equals(id)) {
+                    throw new RuntimeException("Já existe outro fornecedor com este CNPJ.");
+                }
+            });
+
+    fornecedor.setNome(dto.getNome());
+    fornecedor.setCnpj(dto.getCnpj());
+    fornecedor.setTelefone(dto.getTelefone());
+    fornecedor.setEmail(dto.getEmail());
+    fornecedor.setEndereco(dto.getEndereco());
+    fornecedor.setPrazoEntregaDias(dto.getPrazoEntregaDias()); // NOVO
+
+    return repository.save(fornecedor);
+}
     public void deletar(Long id) {
         Fornecedor fornecedor = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado"));
