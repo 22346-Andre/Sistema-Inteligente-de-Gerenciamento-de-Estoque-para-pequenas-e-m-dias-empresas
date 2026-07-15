@@ -42,6 +42,11 @@
             <name>Maven Central Repository</name>
             <url>https://repo1.maven.org/maven2/</url>
         </repository>
+
+         <repository>
+        <id>ow2-public</id>
+        <url>https://repository.ow2.org/nexus/content/repositories/public/</url>
+    </repository>
     </repositories>
 
     <dependencies>
@@ -124,7 +129,11 @@
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
-        
+        <dependency>
+        <groupId>net.sourceforge.jFuzzyLogic</groupId>
+        <artifactId>jFuzzyLogic</artifactId>
+        <version>1.2.1</version>
+    </dependency>
 
     </dependencies>
 

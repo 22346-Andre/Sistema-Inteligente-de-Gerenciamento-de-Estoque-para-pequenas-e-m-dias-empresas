@@ -1,6 +1,7 @@
 package com.smartstock.backend.controller;
 
 import com.smartstock.backend.dto.SugestaoCompraDTO;
+import com.smartstock.backend.dto.SugestaoFornecedorDTO;
 import com.smartstock.backend.service.SugestaoCompraService;
 import com.smartstock.backend.service.EmailService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +49,12 @@ public class SugestaoCompraController {
                 .headers(headers)
                 .body(csvBytes);
     }
+
+    @GetMapping("/textos-fornecedores")
+public ResponseEntity<List<SugestaoFornecedorDTO>> listarTextosFornecedores() {
+    Long empresaId = getEmpresaIdLogada();
+    return ResponseEntity.ok(service.gerarTextosPorFornecedor(empresaId));
+}
 
     //
     @PostMapping("/enviar-email")

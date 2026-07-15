@@ -14,6 +14,13 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.smartstock.backend.dto.SugestaoFornecedorDTO;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 @Service
 public class SugestaoCompraService {
 
@@ -129,4 +136,51 @@ public class SugestaoCompraService {
 
         return finalBytes;
     }
+
+    public List<SugestaoFornecedorDTO> gerarTextosPorFornecedor(Long empresaId) {
+    List<SugestaoCompraDTO> sugestoes = listarSugestoesPorEmpresa(empresaId);
+
+    // Agrupa os itens críticos por fornecedor, mantendo a ordem de urgência já definida
+    Map<String, List<SugestaoCompraDTO>> porFornecedor = sugestoes.stream()
+            .collect(Collectors.groupingBy(
+                    SugestaoCompraDTO::getNomeFornecedor,
+                    LinkedHashMap::new,
+                    Collectors.toList()
+            ));
+
+    List<SugestaoFornecedorDTO> resultado = new ArrayList<>();
+
+    for (Map.Entry<String, List<SugestaoCompraDTO>> entry : porFornecedor.entrySet()) {
+        String fornecedor = entry.getKey();
+        List<SugestaoCompraDTO> itens = entry.getValue();
+        String telefone = itens.get(0).getTelefoneFornecedor();
+
+        StringBuilder texto = new StringBuilder();
+        texto.append("Olá, ").append(fornecedor).append("! Tudo bem?\n\n");
+        texto.append("Gostaríamos de fazer um pedido de reposição:\n\n");
+
+        for (SugestaoCompraDTO item : itens) {
+            texto.append("• ").append(item.getNomeProduto())
+                 .append(" — ").append(item.getQuantidadeSugerida()).append(" un.");
+            if ("URGENTE".equals(item.getUrgencia())) {
+                texto.append(" (URGENTE)");
+            }
+            texto.append("\n");
+        }
+
+        texto.append("\nPodem confirmar disponibilidade e prazo de entrega?\n");
+        texto.append("Obrigado!");
+
+        String linkWhatsApp = null;
+        if (telefone != null && !telefone.isBlank()) {
+            String telefoneLimpo = telefone.replaceAll("[^0-9]", "");
+            String textoCodificado = URLEncoder.encode(texto.toString(), StandardCharsets.UTF_8);
+            linkWhatsApp = "https://wa.me/" + telefoneLimpo + "?text=" + textoCodificado;
+        }
+
+        resultado.add(new SugestaoFornecedorDTO(fornecedor, telefone, texto.toString(), linkWhatsApp, itens));
+    }
+
+    return resultado;
+  }
 }
