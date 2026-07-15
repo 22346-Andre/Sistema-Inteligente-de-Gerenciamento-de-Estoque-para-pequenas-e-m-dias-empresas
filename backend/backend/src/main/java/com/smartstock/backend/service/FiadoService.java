@@ -1,6 +1,8 @@
 package com.smartstock.backend.service;
 
 import com.smartstock.backend.dto.ContaReceberDTO;
+import com.smartstock.backend.exception.AcessoNegadoException;
+import com.smartstock.backend.exception.RecursoNaoEncontradoException;
 import com.smartstock.backend.model.ContaReceber;
 import com.smartstock.backend.model.Empresa;
 import com.smartstock.backend.model.StatusConta;
@@ -26,7 +28,8 @@ public class FiadoService {
     }
 
     public ContaReceber registrarFiado(Long empresaId, ContaReceberDTO dto) {
-        Empresa empresa = empresaRepository.findById(empresaId).orElseThrow();
+        Empresa empresa = empresaRepository.findById(empresaId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada: id=" + empresaId));
 
         ContaReceber conta = new ContaReceber();
         conta.setEmpresa(empresa);
@@ -40,7 +43,6 @@ public class FiadoService {
         if (dto.getDataProximaCobranca() != null) {
             conta.setDataProximaCobranca(dto.getDataProximaCobranca()); // O lojista escolheu a data
         } else {
-
             conta.setDataProximaCobranca(dto.getDataVencimento());
         }
 
@@ -51,20 +53,20 @@ public class FiadoService {
         return contaRepository.findByEmpresaIdOrderByDataVencimentoAsc(empresaId);
     }
 
-    public ContaReceber marcarComoPago(Long id) {
-        ContaReceber conta = contaRepository.findById(id).orElseThrow();
+    public ContaReceber marcarComoPago(Long id, Long empresaId) {
+        ContaReceber conta = buscarContaDaEmpresa(id, empresaId);
         conta.setStatus(StatusConta.PAGO);
         return contaRepository.save(conta);
     }
 
-    public ContaReceber adiarCobranca(Long id, int diasParaAdiar) {
-        ContaReceber conta = contaRepository.findById(id).orElseThrow();
+    public ContaReceber adiarCobranca(Long id, int diasParaAdiar, Long empresaId) {
+        ContaReceber conta = buscarContaDaEmpresa(id, empresaId);
         conta.setDataProximaCobranca(LocalDate.now().plusDays(diasParaAdiar));
         return contaRepository.save(conta);
     }
 
-    public String gerarLinkCobrancaWhatsApp(Long id) {
-        ContaReceber conta = contaRepository.findById(id).orElseThrow();
+    public String gerarLinkCobrancaWhatsApp(Long id, Long empresaId) {
+        ContaReceber conta = buscarContaDaEmpresa(id, empresaId);
 
         String telefoneLimpo = conta.getTelefoneCliente().replaceAll("[^0-9]", "");
         if (!telefoneLimpo.startsWith("55")) telefoneLimpo = "55" + telefoneLimpo;
@@ -88,14 +90,7 @@ public class FiadoService {
     }
 
     public ContaReceber atualizarFiado(Long id, ContaReceberDTO dto, Long empresaId) {
-        ContaReceber conta = contaRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Fiado não encontrado!"));
-
-
-        if (!conta.getEmpresa().getId().equals(empresaId)) {
-            throw new RuntimeException("Operação não permitida!");
-        }
-
+        ContaReceber conta = buscarContaDaEmpresa(id, empresaId);
 
         conta.setNomeCliente(dto.getNomeCliente());
         conta.setValor(dto.getValor());
@@ -115,5 +110,17 @@ public class FiadoService {
         }
 
         return contaRepository.save(conta);
+    }
+
+    
+    private ContaReceber buscarContaDaEmpresa(Long id, Long empresaId) {
+        ContaReceber conta = contaRepository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Fiado não encontrado: id=" + id));
+
+        if (!conta.getEmpresa().getId().equals(empresaId)) {
+            throw new AcessoNegadoException("Operação não permitida para esta empresa!");
+        }
+
+        return conta;
     }
 }
