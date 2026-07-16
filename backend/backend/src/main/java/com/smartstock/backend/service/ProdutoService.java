@@ -121,13 +121,16 @@ public class ProdutoService {
 
     @jakarta.transaction.Transactional
     public Produto salvar(ProdutoDTO dto) {
-        if (repository.existsByNome(dto.getNome())) {
-            throw new RuntimeException("Erro: O produto '" + dto.getNome() + "' já existe no sistema!");
-        }
-
         Long empresaIdLogada = getEmpresaIdLogada();
         Empresa empresa = empresaRepository.findById(empresaIdLogada)
                 .orElseThrow(() -> new RuntimeException("Erro: Empresa não encontrada."));
+
+        // A unicidade do nome deve valer só dentro da própria empresa, não no
+        // sistema inteiro — senão a Empresa A cadastrar "Arroz" impediria
+        // qualquer outra empresa de usar esse mesmo nome.
+        if (repository.findByNomeAndEmpresa(dto.getNome(), empresa).isPresent()) {
+            throw new RuntimeException("Erro: O produto '" + dto.getNome() + "' já existe no sistema!");
+        }
 
         Produto produto = new Produto();
         produto.setNome(dto.getNome());
@@ -161,11 +164,6 @@ public class ProdutoService {
 
         Produto produtoSalvo = repository.save(produto);
 
-        // Gera o rastro (movimentação de ENTRADA) do estoque inicial de cadastro.
-        // Isso garante que os relatórios retroativos (Balanço Geral / Inventário
-        // Fiscal) consigam reconstruir corretamente a quantidade em qualquer data,
-        // sem depender só do campo data_criacao — cada unidade em estoque agora
-        // tem uma movimentação real que explica de onde ela veio.
         if (quantidadeInicial > 0) {
             String cfopOperacao = calcularCfopInterno(TipoMovimentacao.ENTRADA, produtoSalvo);
 
@@ -200,7 +198,10 @@ public class ProdutoService {
         produto.setPrecoCusto(dto.getPrecoCusto());
         produto.setPrecoVenda(dto.getPrecoVenda());
         produto.setEstoqueMinimo(dto.getQuantidadeMinima() != null ? dto.getQuantidadeMinima() : 5);
-        produto.setQuantidade(dto.getQuantidade());
+        // Se o payload não enviar quantidade, mantém a quantidade atual em vez de
+        // gravar null (o que quebraria com NPE qualquer comparação numérica
+        // posterior, como em MovimentacaoService.registrarViaPDV/registrarSaida).
+        produto.setQuantidade(dto.getQuantidade() != null ? dto.getQuantidade() : quantidadeAntes);
         produto.setNcm(dto.getNcm());
         produto.setCfop(dto.getCfop());
 

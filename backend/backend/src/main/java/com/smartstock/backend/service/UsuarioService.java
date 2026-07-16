@@ -126,6 +126,13 @@ public class UsuarioService {
             throw new RuntimeException("Você não pode alterar o seu próprio cargo. Peça a outro administrador.");
         }
 
+        // Somente um SUPER_ADMIN pode promover outra pessoa a SUPER_ADMIN.
+        // Sem essa checagem, um ADMIN comum conseguiria se auto-promover indiretamente
+        // promovendo um colega e depois pedindo para esse colega alterá-lo.
+        if ("SUPER_ADMIN".equals(dto.getPerfil()) && !"SUPER_ADMIN".equals(adminLogado.getPerfil())) {
+            throw new RuntimeException("Acesso negado: Você não tem permissão para atribuir o perfil SUPER_ADMIN.");
+        }
+
         usuarioAlvo.setNome(dto.getNome());
         usuarioAlvo.setEmail(dto.getEmail());
         usuarioAlvo.setPerfil(dto.getPerfil());
