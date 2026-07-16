@@ -133,8 +133,16 @@ public class ImportacaoService {
             }
             produtosPorNome.put(p.getNome(), p);
         }
-        Map<Long, Fornecedor> fornecedoresPorId = fornecedorRepository.findByEmpresaId(tenantIdAtual).stream()
-                .collect(Collectors.toMap(Fornecedor::getId, f -> f));
+        Map<String, Fornecedor> fornecedoresPorCnpj = new HashMap<>();
+        Map<String, Fornecedor> fornecedoresPorNome = new HashMap<>();
+        for (Fornecedor f : fornecedorRepository.findByEmpresaId(tenantIdAtual)) {
+            if (f.getCnpj() != null && !f.getCnpj().isBlank()) {
+                fornecedoresPorCnpj.put(normalizarCnpj(f.getCnpj()), f);
+            }
+            if (f.getNome() != null && !f.getNome().isBlank()) {
+                fornecedoresPorNome.put(f.getNome().trim().toLowerCase(), f);
+            }
+        }
 
         for (ProdutoDTO pLido : produtosLidos) {
             if (pLido.getNome() == null || pLido.getNome().trim().isEmpty()) {
@@ -152,7 +160,9 @@ public class ImportacaoService {
 
             Integer quantidadeLida = (pLido.getQuantidade() != null && pLido.getQuantidade() > 0) ? pLido.getQuantidade() : 0;
 
-            Fornecedor fornecedorResolvido = resolverFornecedorPorId(pLido.getFornecedorId(), fornecedoresPorId, pLido.getNome(), relatorio.avisos);
+            Fornecedor fornecedorResolvido = resolverOuCriarFornecedorCsv(
+                    pLido.getFornecedorNome(), pLido.getFornecedorCnpj(),
+                    fornecedoresPorCnpj, fornecedoresPorNome, empresaLogada, relatorio.avisos);
             List<Imposto> impostosLidos = montarImpostos(pLido.getIcms(), pLido.getIpi(), pLido.getPis(), pLido.getCofins());
 
             Produto pSalvo;
@@ -555,20 +565,60 @@ public class ImportacaoService {
                 });
     }
 
-    /**
-     * Resolve o fornecedor da linha do CSV a partir de um mapa pré-carregado (evita
-     * 1 query por linha). Se o ID vier preenchido mas não existir NA EMPRESA LOGADA,
-     * gera um aviso em vez de falhar silenciosamente.
-     */
-    private Fornecedor resolverFornecedorPorId(Long fornecedorId, Map<Long, Fornecedor> fornecedoresPorId,
-                                                String nomeProdutoParaAviso, List<String> avisos) {
-        if (fornecedorId == null) return null;
-        Fornecedor f = fornecedoresPorId.get(fornecedorId);
-        if (f == null) {
-            avisos.add("Fornecedor ID " + fornecedorId + " não encontrado para a empresa logada (produto '"
-                    + nomeProdutoParaAviso + "' importado sem vínculo de fornecedor).");
+    
+    private Fornecedor resolverOuCriarFornecedorCsv(String nomeLido, String cnpjLido,
+                                                      Map<String, Fornecedor> fornecedoresPorCnpj,
+                                                      Map<String, Fornecedor> fornecedoresPorNome,
+                                                      Empresa empresaLogada,
+                                                      List<String> avisos) {
+        String nome = (nomeLido != null) ? nomeLido.trim() : "";
+        String cnpj = normalizarCnpj(cnpjLido);
+
+        if (nome.isEmpty() && cnpj.isEmpty()) {
+            return null; // linha não informou fornecedor — mesmo comportamento de antes
         }
-        return f;
+
+        // 1) Busca por CNPJ, se informado — é a chave mais confiável
+        if (!cnpj.isEmpty()) {
+            Fornecedor existente = fornecedoresPorCnpj.get(cnpj);
+            if (existente != null) return existente;
+
+            Fornecedor novo = new Fornecedor();
+            novo.setCnpj(cnpj);
+            novo.setNome(!nome.isEmpty() ? nome : "Fornecedor importado via CSV");
+            novo.setEmpresa(empresaLogada);
+            Fornecedor salvo = fornecedorRepository.save(novo);
+
+            fornecedoresPorCnpj.put(cnpj, salvo);
+            if (!salvo.getNome().isBlank()) fornecedoresPorNome.put(salvo.getNome().toLowerCase(), salvo);
+
+            avisos.add("Fornecedor '" + salvo.getNome() + "' (CNPJ " + cnpj + ") não existia e foi cadastrado automaticamente.");
+            return salvo;
+        }
+
+        // 2) Sem CNPJ na linha: busca por nome
+        Fornecedor existente = fornecedoresPorNome.get(nome.toLowerCase());
+        if (existente != null) return existente;
+
+        String cnpjPendente = "PENDENTE-" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        Fornecedor novo = new Fornecedor();
+        novo.setNome(nome);
+        novo.setCnpj(cnpjPendente);
+        novo.setEmpresa(empresaLogada);
+        Fornecedor salvo = fornecedorRepository.save(novo);
+
+        fornecedoresPorNome.put(nome.toLowerCase(), salvo);
+        fornecedoresPorCnpj.put(cnpjPendente, salvo);
+
+        avisos.add("Fornecedor '" + nome + "' não existia e foi cadastrado automaticamente sem CNPJ "
+                + "(a planilha não informou um). Edite o cadastro do fornecedor em 'Fornecedores' para completar o CNPJ real.");
+        return salvo;
+    }
+
+    /** Mantém só os dígitos do CNPJ, pra comparar "12.345.678/0001-90" com "12345678000190". */
+    private String normalizarCnpj(String cnpj) {
+        if (cnpj == null) return "";
+        return cnpj.replaceAll("\\D", "");
     }
 
     /**

@@ -61,8 +61,17 @@ public class ProdutoDTO {
     @CsvBindByName(column = "unidade")
     private String unidade;
 
+    // Usado pelo formulário manual de produto (dropdown de fornecedor já cadastrado)
     @CsvBindByName(column = "fornecedorId")
     private Long fornecedorId;
+
+    // Usados pela importação em massa (CSV): informe nome e/ou CNPJ do fornecedor
+    // em vez do ID — se não existir, é cadastrado automaticamente.
+    @CsvBindByName(column = "fornecedorNome")
+    private String fornecedorNome;
+
+    @CsvBindByName(column = "fornecedorCnpj")
+    private String fornecedorCnpj;
 
     @CsvBindByName(column = "finalidadeEstoque")
     private String finalidadeEstoque;
