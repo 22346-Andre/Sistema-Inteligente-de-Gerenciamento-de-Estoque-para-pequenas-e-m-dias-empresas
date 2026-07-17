@@ -75,33 +75,54 @@ public class ProdutoService {
             return produtos;
         }
 
+        // Ordena por valor em estoque (desc). Em caso de empate no valor, desempata
+        // pelo nome — sem isso, dois produtos de valor IGUAL podiam vir em ordens
+        // diferentes a cada consulta (a query não tem ORDER BY, então o "empate" era
+        // resolvido pela ordem física do banco, que não é garantida), fazendo o
+        // mesmo produto aparecer ora como A, ora como B numa próxima atualização.
         produtos.sort((p1, p2) -> {
-            BigDecimal v1 = (p1.getPrecoCusto() != null ? p1.getPrecoCusto() : BigDecimal.ZERO)
-                    .multiply(new BigDecimal(p1.getQuantidade() != null ? p1.getQuantidade() : 0));
-            BigDecimal v2 = (p2.getPrecoCusto() != null ? p2.getPrecoCusto() : BigDecimal.ZERO)
-                    .multiply(new BigDecimal(p2.getQuantidade() != null ? p2.getQuantidade() : 0));
-            return v2.compareTo(v1);
+            BigDecimal v1 = valorEmEstoque(p1);
+            BigDecimal v2 = valorEmEstoque(p2);
+            int cmp = v2.compareTo(v1);
+            return cmp != 0 ? cmp : p1.getNome().compareToIgnoreCase(p2.getNome());
         });
 
+        // Classifica em BLOCOS de valor igual, não produto a produto. Antes, dois
+        // produtos com o MESMO valor em estoque podiam cair em classes diferentes
+        // (até A e C) só porque a soma acumulada cruzava o corte de 80%/95% bem no
+        // meio dos dois — um efeito colateral do corte percentual "duro" que não
+        // tinha nada a ver com a real importância de cada um. Agora o corte só é
+        // aplicado DEPOIS de somar o valor de todo o grupo empatado, então produtos
+        // com o mesmo valor sempre acabam na mesma classe.
         BigDecimal acumulado = BigDecimal.ZERO;
-        for (Produto p : produtos) {
-            BigDecimal valorItem = (p.getPrecoCusto() != null ? p.getPrecoCusto() : BigDecimal.ZERO)
-                    .multiply(new BigDecimal(p.getQuantidade() != null ? p.getQuantidade() : 0));
+        int i = 0;
+        while (i < produtos.size()) {
+            BigDecimal valorDoBloco = valorEmEstoque(produtos.get(i));
+            int fimBloco = i;
+            while (fimBloco < produtos.size() && valorEmEstoque(produtos.get(fimBloco)).compareTo(valorDoBloco) == 0) {
+                fimBloco++;
+            }
 
-            acumulado = acumulado.add(valorItem);
+            int quantidadeNoBloco = fimBloco - i;
+            acumulado = acumulado.add(valorDoBloco.multiply(BigDecimal.valueOf(quantidadeNoBloco)));
             double percentual = acumulado.divide(totalEstoque, 4, RoundingMode.HALF_UP).doubleValue() * 100;
 
-            if (percentual <= 80.0) {
-                p.setClassificacaoABC("A");
-            } else if (percentual <= 95.0) {
-                p.setClassificacaoABC("B");
-            } else {
-                p.setClassificacaoABC("C");
+            String classe = percentual <= 80.0 ? "A" : percentual <= 95.0 ? "B" : "C";
+            for (int k = i; k < fimBloco; k++) {
+                produtos.get(k).setClassificacaoABC(classe);
             }
+
+            i = fimBloco;
         }
 
         produtos.sort(Comparator.comparing(Produto::getNome));
         return produtos;
+    }
+
+    /** Valor total do produto parado em estoque: custo unitário × quantidade. Usado na Curva ABC. */
+    private BigDecimal valorEmEstoque(Produto p) {
+        return (p.getPrecoCusto() != null ? p.getPrecoCusto() : BigDecimal.ZERO)
+                .multiply(new BigDecimal(p.getQuantidade() != null ? p.getQuantidade() : 0));
     }
 
     public Produto buscarPorId(Long id) {
@@ -164,6 +185,11 @@ public class ProdutoService {
 
         Produto produtoSalvo = repository.save(produto);
 
+        // Gera o rastro (movimentação de ENTRADA) do estoque inicial de cadastro.
+        // Isso garante que os relatórios retroativos (Balanço Geral / Inventário
+        // Fiscal) consigam reconstruir corretamente a quantidade em qualquer data,
+        // sem depender só do campo data_criacao — cada unidade em estoque agora
+        // tem uma movimentação real que explica de onde ela veio.
         if (quantidadeInicial > 0) {
             String cfopOperacao = calcularCfopInterno(TipoMovimentacao.ENTRADA, produtoSalvo);
 
