@@ -565,38 +565,58 @@ public class ImportacaoService {
                 });
     }
 
-    
+    /**
+     * Resolve o fornecedor de uma linha do CSV a partir do nome e/ou CNPJ informados
+     * (mapas pré-carregados, sem 1 query por linha). Se não encontrar um fornecedor
+     * já cadastrado, CADASTRA um novo automaticamente — igual já acontece com os
+     * produtos — em vez de só avisar e deixar o produto sem vínculo.
+     *
+     * Prioridade de busca/criação: CNPJ (chave mais confiável) e, na ausência dele,
+     * o nome. Quando o fornecedor precisa ser criado só com nome (sem CNPJ na
+     * planilha), o campo cnpj é obrigatório no banco — geramos um placeholder
+     * "PENDENTE-XXXXXXXX" e avisamos no relatório para o gestor completar depois
+     * em Fornecedores.
+     */
     private Fornecedor resolverOuCriarFornecedorCsv(String nomeLido, String cnpjLido,
                                                       Map<String, Fornecedor> fornecedoresPorCnpj,
                                                       Map<String, Fornecedor> fornecedoresPorNome,
                                                       Empresa empresaLogada,
                                                       List<String> avisos) {
         String nome = (nomeLido != null) ? nomeLido.trim() : "";
-        String cnpj = normalizarCnpj(cnpjLido);
+        String cnpjDigitos = normalizarCnpj(cnpjLido);
+        boolean cnpjInformadoEhValido = !cnpjDigitos.isEmpty() && cnpjValido(cnpjDigitos);
 
-        if (nome.isEmpty() && cnpj.isEmpty()) {
-            return null; // linha não informou fornecedor — mesmo comportamento de antes
+        if (!cnpjDigitos.isEmpty() && !cnpjInformadoEhValido) {
+            avisos.add("CNPJ '" + cnpjLido + "' informado para o fornecedor '"
+                    + (!nome.isEmpty() ? nome : "(sem nome)")
+                    + "' é inválido (dígito verificador não confere) e foi ignorado; "
+                    + "o fornecedor foi resolvido/cadastrado apenas pelo nome.");
         }
 
-        // 1) Busca por CNPJ, se informado — é a chave mais confiável
-        if (!cnpj.isEmpty()) {
-            Fornecedor existente = fornecedoresPorCnpj.get(cnpj);
+        if (nome.isEmpty() && !cnpjInformadoEhValido) {
+            return null; // linha não informou um fornecedor utilizável — mesmo comportamento de antes
+        }
+
+        // 1) Busca/cria por CNPJ, se um CNPJ válido foi informado — é a chave mais confiável
+        if (cnpjInformadoEhValido) {
+            Fornecedor existente = fornecedoresPorCnpj.get(cnpjDigitos);
             if (existente != null) return existente;
 
+            String cnpjFormatado = formatarCnpj(cnpjDigitos);
             Fornecedor novo = new Fornecedor();
-            novo.setCnpj(cnpj);
+            novo.setCnpj(cnpjFormatado); // salvo com a mesma máscara usada no cadastro manual
             novo.setNome(!nome.isEmpty() ? nome : "Fornecedor importado via CSV");
             novo.setEmpresa(empresaLogada);
             Fornecedor salvo = fornecedorRepository.save(novo);
 
-            fornecedoresPorCnpj.put(cnpj, salvo);
+            fornecedoresPorCnpj.put(cnpjDigitos, salvo);
             if (!salvo.getNome().isBlank()) fornecedoresPorNome.put(salvo.getNome().toLowerCase(), salvo);
 
-            avisos.add("Fornecedor '" + salvo.getNome() + "' (CNPJ " + cnpj + ") não existia e foi cadastrado automaticamente.");
+            avisos.add("Fornecedor '" + salvo.getNome() + "' (CNPJ " + cnpjFormatado + ") não existia e foi cadastrado automaticamente.");
             return salvo;
         }
 
-        // 2) Sem CNPJ na linha: busca por nome
+        // 2) Sem CNPJ válido na linha: busca/cria por nome (nome garantidamente não vazio aqui)
         Fornecedor existente = fornecedoresPorNome.get(nome.toLowerCase());
         if (existente != null) return existente;
 
@@ -611,7 +631,7 @@ public class ImportacaoService {
         fornecedoresPorCnpj.put(cnpjPendente, salvo);
 
         avisos.add("Fornecedor '" + nome + "' não existia e foi cadastrado automaticamente sem CNPJ "
-                + "(a planilha não informou um). Edite o cadastro do fornecedor em 'Fornecedores' para completar o CNPJ real.");
+                + "(a planilha não informou um válido). Edite o cadastro do fornecedor em 'Fornecedores' para completar o CNPJ real.");
         return salvo;
     }
 
@@ -619,6 +639,37 @@ public class ImportacaoService {
     private String normalizarCnpj(String cnpj) {
         if (cnpj == null) return "";
         return cnpj.replaceAll("\\D", "");
+    }
+
+    /**
+     * Validação real de CNPJ (14 dígitos + dígitos verificadores), não só contagem
+     * de caracteres — pega tanto erro de digitação quanto CNPJ "de mentira"
+     * (sequências repetidas tipo 11111111111111) que passariam batido só checando o tamanho.
+     */
+    private boolean cnpjValido(String digitos) {
+        if (digitos == null || digitos.length() != 14) return false;
+        if (digitos.chars().distinct().count() == 1) return false;
+
+        int[] pesos1 = {5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
+        int[] pesos2 = {6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
+
+        int soma1 = 0;
+        for (int i = 0; i < 12; i++) soma1 += (digitos.charAt(i) - '0') * pesos1[i];
+        int resto1 = soma1 % 11;
+        int dv1 = resto1 < 2 ? 0 : 11 - resto1;
+        if (dv1 != (digitos.charAt(12) - '0')) return false;
+
+        int soma2 = 0;
+        for (int i = 0; i < 13; i++) soma2 += (digitos.charAt(i) - '0') * pesos2[i];
+        int resto2 = soma2 % 11;
+        int dv2 = resto2 < 2 ? 0 : 11 - resto2;
+        return dv2 == (digitos.charAt(13) - '0');
+    }
+
+    /** Formata 14 dígitos já validados no padrão XX.XXX.XXX/XXXX-XX, igual ao cadastro manual. */
+    private String formatarCnpj(String digitos) {
+        return digitos.substring(0, 2) + "." + digitos.substring(2, 5) + "." + digitos.substring(5, 8)
+                + "/" + digitos.substring(8, 12) + "-" + digitos.substring(12, 14);
     }
 
     /**
