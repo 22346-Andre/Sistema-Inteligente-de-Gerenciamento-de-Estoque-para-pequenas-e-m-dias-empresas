@@ -47,4 +47,9 @@ public interface MovimentacaoRepository extends JpaRepository<Movimentacao, Long
        "WHERE m.produto.id = :produtoId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataInicio")
 Integer sumSaidasPorProdutoUltimosDias(@Param("produtoId") Long produtoId,
                                        @Param("dataInicio") LocalDateTime dataInicio);
+
+    // Data da última venda (SAIDA) de um produto — usado no painel de Estoque Morto,
+    // pra dizer desde quando o dinheiro está parado naquele item.
+    @Query("SELECT MAX(m.dataMovimentacao) FROM Movimentacao m WHERE m.produto.id = :produtoId AND m.tipo = 'SAIDA'")
+    LocalDateTime buscarDataUltimaVenda(@Param("produtoId") Long produtoId);
 }

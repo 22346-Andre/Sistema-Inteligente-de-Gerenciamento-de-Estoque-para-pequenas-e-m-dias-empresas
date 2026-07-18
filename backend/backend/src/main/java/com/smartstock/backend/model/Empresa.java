@@ -32,4 +32,8 @@ public class Empresa {
 
 
     private LocalDateTime ultimoAcesso = LocalDateTime.now(); // Já começa com a data de hoje ao criar
+
+    
+    @Column(name = "dias_estoque_morto")
+    private Integer diasParaEstoqueMorto = 90;
 }

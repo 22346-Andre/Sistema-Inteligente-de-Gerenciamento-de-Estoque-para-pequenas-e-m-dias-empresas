@@ -79,6 +79,11 @@ public class EmpresaController {
         minhaEmpresa.setCidade(dtoAtualizacao.getCidade());
         minhaEmpresa.setEstado(dtoAtualizacao.getEstado());
 
+        
+        if (dtoAtualizacao.getDiasParaEstoqueMorto() != null && dtoAtualizacao.getDiasParaEstoqueMorto() > 0) {
+            minhaEmpresa.setDiasParaEstoqueMorto(dtoAtualizacao.getDiasParaEstoqueMorto());
+        }
+
         // Salva a alteração no banco de dados
         Empresa empresaAtualizada = empresaRepository.save(minhaEmpresa);
 
