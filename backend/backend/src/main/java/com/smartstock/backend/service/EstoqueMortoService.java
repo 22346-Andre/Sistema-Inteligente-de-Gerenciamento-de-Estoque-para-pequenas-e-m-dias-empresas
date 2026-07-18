@@ -91,9 +91,15 @@ public class EstoqueMortoService {
             }
 
             dto.setPrecoVendaAtual(precoVenda);
-            dto.setPrecoVendaQueima(
-                    precoVenda.multiply(BigDecimal.ONE.subtract(DESCONTO_QUEIMA)).setScale(2, RoundingMode.HALF_UP)
-            );
+
+            
+            BigDecimal precoQueimaCheio = precoVenda.multiply(BigDecimal.ONE.subtract(DESCONTO_QUEIMA))
+                    .setScale(2, RoundingMode.HALF_UP);
+            boolean precisouAjustar = precoQueimaCheio.compareTo(custo) < 0;
+            BigDecimal precoQueimaFinal = precisouAjustar ? custo.setScale(2, RoundingMode.HALF_UP) : precoQueimaCheio;
+
+            dto.setPrecoVendaQueima(precoQueimaFinal);
+            dto.setMargemAjustada(precisouAjustar);
 
             lista.add(dto);
         }
@@ -120,7 +126,7 @@ public class EstoqueMortoService {
         List<EstoqueMortoDTO> itens = listarEstoqueMortoPorEmpresa(empresaId);
         StringBuilder csv = new StringBuilder();
 
-        csv.append("PRODUTO;FORNECEDOR;QTD_PARADA;ULTIMA_VENDA;VALOR_CUSTO_UNIT;DINHEIRO_PARADO;PRECO_VENDA_ATUAL;PRECO_QUEIMA_30OFF\n");
+        csv.append("PRODUTO;FORNECEDOR;QTD_PARADA;ULTIMA_VENDA;VALOR_CUSTO_UNIT;DINHEIRO_PARADO;PRECO_VENDA_ATUAL;PRECO_QUEIMA_30OFF;OBSERVACAO\n");
 
         for (EstoqueMortoDTO d : itens) {
             csv.append(d.getNomeProduto()).append(";")
@@ -130,7 +136,9 @@ public class EstoqueMortoService {
                     .append(d.getValorUnitarioCusto().toString().replace(".", ",")).append(";")
                     .append(d.getValorParado().toString().replace(".", ",")).append(";")
                     .append(d.getPrecoVendaAtual().toString().replace(".", ",")).append(";")
-                    .append(d.getPrecoVendaQueima().toString().replace(".", ",")).append("\n");
+                    .append(d.getPrecoVendaQueima().toString().replace(".", ",")).append(";")
+                    .append(d.isMargemAjustada() ? "Margem original menor que 30%; preco travado no custo (lucro zero) para nao vender no prejuizo" : "")
+                    .append("\n");
         }
 
         byte[] bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
