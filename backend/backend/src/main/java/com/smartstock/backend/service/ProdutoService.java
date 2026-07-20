@@ -75,11 +75,7 @@ public class ProdutoService {
             return produtos;
         }
 
-        // Ordena por valor em estoque (desc). Em caso de empate no valor, desempata
-        // pelo nome — sem isso, dois produtos de valor IGUAL podiam vir em ordens
-        // diferentes a cada consulta (a query não tem ORDER BY, então o "empate" era
-        // resolvido pela ordem física do banco, que não é garantida), fazendo o
-        // mesmo produto aparecer ora como A, ora como B numa próxima atualização.
+       
         produtos.sort((p1, p2) -> {
             BigDecimal v1 = valorEmEstoque(p1);
             BigDecimal v2 = valorEmEstoque(p2);
@@ -87,13 +83,7 @@ public class ProdutoService {
             return cmp != 0 ? cmp : p1.getNome().compareToIgnoreCase(p2.getNome());
         });
 
-        // Classifica em BLOCOS de valor igual, não produto a produto. Antes, dois
-        // produtos com o MESMO valor em estoque podiam cair em classes diferentes
-        // (até A e C) só porque a soma acumulada cruzava o corte de 80%/95% bem no
-        // meio dos dois — um efeito colateral do corte percentual "duro" que não
-        // tinha nada a ver com a real importância de cada um. Agora o corte só é
-        // aplicado DEPOIS de somar o valor de todo o grupo empatado, então produtos
-        // com o mesmo valor sempre acabam na mesma classe.
+      
         BigDecimal acumulado = BigDecimal.ZERO;
         int i = 0;
         while (i < produtos.size()) {
@@ -125,6 +115,8 @@ public class ProdutoService {
                 .multiply(new BigDecimal(p.getQuantidade() != null ? p.getQuantidade() : 0));
     }
 
+    
+    @jakarta.transaction.Transactional
     public Produto buscarPorId(Long id) {
         Produto produto = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Produto não encontrado com o ID: " + id));
@@ -132,6 +124,8 @@ public class ProdutoService {
         if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
             throw new RuntimeException("Acesso negado: Este produto pertence a outra empresa.");
         }
+
+        produto.getImpostos().size(); // força o carregamento agora, dentro da transação
 
         return produto;
     }
