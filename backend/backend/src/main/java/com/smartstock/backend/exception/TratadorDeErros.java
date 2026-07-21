@@ -1,5 +1,7 @@
 package com.smartstock.backend.exception;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -14,6 +16,8 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class TratadorDeErros {
+
+    private static final Logger logger = LoggerFactory.getLogger(TratadorDeErros.class);
 
     // 1. CAPTURA ERRO DE LOGIN (E-mail ou Senha errados)
     @ExceptionHandler(BadCredentialsException.class)
@@ -48,7 +52,37 @@ public class TratadorDeErros {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(resposta);
     }
 
-    // 3. CAPTURA ERROS GERAIS DO SISTEMA (Os RuntimeExceptions dos Services)
+    // 3. RECURSO NÃO ENCONTRADO — 404, mensagem genérica pro cliente (detalhe só no log)
+    @ExceptionHandler(RecursoNaoEncontradoException.class)
+    public ResponseEntity<Map<String, String>> tratarRecursoNaoEncontrado(RecursoNaoEncontradoException ex) {
+        logger.info("Recurso não encontrado: {}", ex.getMessage());
+        Map<String, String> resposta = new HashMap<>();
+        resposta.put("erro", "Recurso não encontrado.");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(resposta);
+    }
+
+    // 4. ACESSO NEGADO (multi-tenant / permissão) — 403, mensagem genérica pro cliente
+    @ExceptionHandler(AcessoNegadoException.class)
+    public ResponseEntity<Map<String, String>> tratarAcessoNegado(AcessoNegadoException ex) {
+        logger.warn("Tentativa de acesso negado: {}", ex.getMessage());
+        Map<String, String> resposta = new HashMap<>();
+        resposta.put("erro", "Acesso negado.");
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(resposta);
+    }
+
+    // 5. ESTOQUE INSUFICIENTE — 409, mensagem específica é segura e útil pro usuário
+    @ExceptionHandler(EstoqueInsuficienteException.class)
+    public ResponseEntity<Map<String, String>> tratarEstoqueInsuficiente(EstoqueInsuficienteException ex) {
+        Map<String, String> resposta = new HashMap<>();
+        resposta.put("erro", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(resposta);
+    }
+
+    // 6. CAPTURA ERROS GERAIS DO SISTEMA (RuntimeException genérica ainda não migrada
+    // pra uma exceção específica acima). Mantido como rede de segurança — ainda
+    // expõe a mensagem da exceção, então RuntimeExceptions novas devem preferir
+    // uma das exceções específicas acima sempre que a mensagem citar detalhe
+    // interno (nome de empresa, ID, etc.).
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, String>> tratarErrosDeRegraDeNegocio(RuntimeException ex) {
         Map<String, String> resposta = new HashMap<>();

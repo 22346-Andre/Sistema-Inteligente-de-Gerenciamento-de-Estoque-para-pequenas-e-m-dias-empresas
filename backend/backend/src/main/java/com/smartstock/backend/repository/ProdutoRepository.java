@@ -2,8 +2,10 @@ package com.smartstock.backend.repository;
 
 import com.smartstock.backend.model.Empresa;
 import com.smartstock.backend.model.Produto;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -17,6 +19,11 @@ public interface ProdutoRepository extends JpaRepository<Produto, Long>, JpaSpec
     boolean existsByNome(String nome);
 
     List<Produto> findByEmpresaId(Long empresaId);
+
+    
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Produto p WHERE p.id = :id")
+    Optional<Produto> buscarComLockParaAtualizacao(@Param("id") Long id);
 
     // Traz o estoque baixo APENAS da empresa logada (Usado no Controller)
     @Query("SELECT p FROM Produto p WHERE p.empresa.id = :empresaId AND p.quantidade <= p.estoqueMinimo")
@@ -51,6 +58,13 @@ public interface ProdutoRepository extends JpaRepository<Produto, Long>, JpaSpec
 
     // Busca produto pelo código de barras E que pertença à empresa logada
     Optional<Produto> findByCodigoBarrasAndEmpresaId(String codigoBarras, Long empresaId);
+
+    // Mesma busca do PDV, mas travando a linha (usada em MovimentacaoService.registrarViaPDV)
+    // pelo mesmo motivo do buscarComLockParaAtualizacao acima: dois PDVs baixando
+    // o mesmo produto ao mesmo tempo não podem sobrescrever a baixa um do outro.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Produto p WHERE p.codigoBarras = :codigoBarras AND p.empresa.id = :empresaId")
+    Optional<Produto> buscarPorCodigoBarrasComLockParaAtualizacao(@Param("codigoBarras") String codigoBarras, @Param("empresaId") Long empresaId);
 
     // Busca EM LOTE por vários códigos de barras de uma vez (evita 1 query por linha do CSV/XML)
     List<Produto> findByCodigoBarrasInAndEmpresaId(List<String> codigosBarras, Long empresaId);

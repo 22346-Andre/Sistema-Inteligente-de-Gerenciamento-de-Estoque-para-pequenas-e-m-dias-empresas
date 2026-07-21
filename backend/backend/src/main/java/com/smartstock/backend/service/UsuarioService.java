@@ -1,5 +1,8 @@
 package com.smartstock.backend.service;
 
+import com.smartstock.backend.exception.AcessoNegadoException;
+import com.smartstock.backend.exception.RecursoNaoEncontradoException;
+
 import com.smartstock.backend.dto.AlterarSenhaDTO;
 import com.smartstock.backend.dto.AtualizarPerfilDTO;
 import com.smartstock.backend.dto.UsuarioDTO;
@@ -35,9 +38,9 @@ public class UsuarioService {
         if (principal instanceof Jwt jwt) {
             String email = jwt.getSubject();
             return repository.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("Erro: Usuário logado não encontrado na base de dados."));
+                    .orElseThrow(() -> new RecursoNaoEncontradoException("Erro: Usuário logado não encontrado na base de dados."));
         }
-        throw new RuntimeException("Acesso negado: Usuário não autenticado ou token inválido.");
+        throw new AcessoNegadoException("Acesso negado: Usuário não autenticado ou token inválido.");
     }
 
     public List<Usuario> listarTodos() {
@@ -55,7 +58,7 @@ public class UsuarioService {
         if (usuarioOpt.isPresent()) {
             Usuario usuario = usuarioOpt.get();
             if (!"SUPER_ADMIN".equals(logado.getPerfil()) && !usuario.getEmpresa().getId().equals(logado.getEmpresa().getId())) {
-                throw new RuntimeException("Acesso negado: Este usuário pertence a outra empresa.");
+                throw new AcessoNegadoException("Acesso negado: Este usuário pertence a outra empresa.");
             }
         }
         return usuarioOpt;
@@ -90,7 +93,7 @@ public class UsuarioService {
         usuario.setTelefone(dto.getTelefone());
 
         if ("SUPER_ADMIN".equals(dto.getPerfil())) {
-            throw new RuntimeException("Acesso negado: Você não tem permissão para criar um SUPER_ADMIN.");
+            throw new AcessoNegadoException("Acesso negado: Você não tem permissão para criar um SUPER_ADMIN.");
         }
 
         usuario.setPerfil(dto.getPerfil() != null ? dto.getPerfil() : "USER");
@@ -102,7 +105,7 @@ public class UsuarioService {
     public Usuario atualizar(Long id, UsuarioDTO dto) {
         Usuario adminLogado = getUsuarioLogado();
         Usuario usuarioAlvo = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado!"));
 
         if (usuarioAlvo.isDono()) {
             throw new RuntimeException("Ação Proibida: A conta do Dono da empresa é protegida e não pode ser editada.");
@@ -114,7 +117,7 @@ public class UsuarioService {
 
         if (!"SUPER_ADMIN".equals(adminLogado.getPerfil())) {
             if (!usuarioAlvo.getEmpresa().getId().equals(adminLogado.getEmpresa().getId())) {
-                throw new RuntimeException("Acesso negado: Empresa divergente.");
+                throw new AcessoNegadoException("Acesso negado: Empresa divergente.");
             }
         }
 
@@ -130,7 +133,7 @@ public class UsuarioService {
         // Sem essa checagem, um ADMIN comum conseguiria se auto-promover indiretamente
         // promovendo um colega e depois pedindo para esse colega alterá-lo.
         if ("SUPER_ADMIN".equals(dto.getPerfil()) && !"SUPER_ADMIN".equals(adminLogado.getPerfil())) {
-            throw new RuntimeException("Acesso negado: Você não tem permissão para atribuir o perfil SUPER_ADMIN.");
+            throw new AcessoNegadoException("Acesso negado: Você não tem permissão para atribuir o perfil SUPER_ADMIN.");
         }
 
         usuarioAlvo.setNome(dto.getNome());
@@ -144,7 +147,7 @@ public class UsuarioService {
     public void deletar(Long id) {
         Usuario adminLogado = getUsuarioLogado();
         Usuario usuarioAlvo = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado!"));
 
         if (usuarioAlvo.isDono()) {
             throw new RuntimeException("Ação Bloqueada: O Dono (criador) da empresa não pode ser removido do sistema.");
@@ -159,7 +162,7 @@ public class UsuarioService {
         }
 
         if (!"SUPER_ADMIN".equals(adminLogado.getPerfil()) && !usuarioAlvo.getEmpresa().getId().equals(adminLogado.getEmpresa().getId())) {
-            throw new RuntimeException("Acesso negado.");
+            throw new AcessoNegadoException("Acesso negado.");
         }
 
         repository.deleteById(id);

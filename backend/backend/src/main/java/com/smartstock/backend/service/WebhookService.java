@@ -1,20 +1,26 @@
 package com.smartstock.backend.service;
 
+import com.smartstock.backend.exception.RecursoNaoEncontradoException;
+
 import com.smartstock.backend.dto.ItemVendaExternaDTO;
 import com.smartstock.backend.dto.VendaExternaDTO;
 import com.smartstock.backend.model.Empresa;
 import com.smartstock.backend.model.Produto;
-import com.smartstock.backend.model.TipoMovimentacao; // 🟢 Import necessário
+import com.smartstock.backend.model.TipoMovimentacao;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
-import java.util.UUID; // 🟢 Import para gerar uma chave única
+import java.util.UUID;
 
 @Service
 public class WebhookService {
+
+    private static final Logger logger = LoggerFactory.getLogger(WebhookService.class);
 
     private final ProdutoRepository produtoRepository;
     private final EmpresaRepository empresaRepository;
@@ -26,11 +32,21 @@ public class WebhookService {
         this.produtoService = produtoService;
     }
 
+    
+    public boolean segredoValidoParaEmpresa(Long empresaId, String segredoRecebido) {
+        if (empresaId == null || segredoRecebido == null) return false;
+
+        return empresaRepository.findById(empresaId)
+                .map(Empresa::getWebhookSecret)
+                .filter(segredoReal -> segredoReal != null && segredoReal.equals(segredoRecebido))
+                .isPresent();
+    }
+
     @Transactional
     public String processarVendaExterna(VendaExternaDTO dto) {
         // 1. Valida a empresa (Tenant SaaS)
         Empresa empresa = empresaRepository.findById(dto.getEmpresaId())
-                .orElseThrow(() -> new RuntimeException("Webhook Erro: Empresa não encontrada."));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Webhook Erro: Empresa não encontrada."));
 
         int itensProcessados = 0;
 
@@ -46,7 +62,8 @@ public class WebhookService {
 
             // Se o vendedor cadastrou na Shopee/ML um produto que não existe no SmartStock, o sistema avisa mas não trava o resto.
             if (produtoOpt.isEmpty()) {
-                System.err.println("Aviso Webhook: Produto com Código '" + item.getCodigoBarras() + "' não encontrado na empresa " + empresa.getNomeFantasia());
+                logger.warn("Webhook: produto com código '{}' não encontrado na empresa {} (id={})",
+                        item.getCodigoBarras(), empresa.getNomeFantasia(), empresa.getId());
                 continue;
             }
 
@@ -62,7 +79,8 @@ public class WebhookService {
                 );
                 itensProcessados++;
             } catch (Exception e) {
-                System.err.println("Aviso Webhook: Falha ao baixar estoque do item " + item.getCodigoBarras() + " -> " + e.getMessage());
+                logger.error("Webhook: falha ao baixar estoque do item '{}' (empresa id={}): {}",
+                        item.getCodigoBarras(), empresa.getId(), e.getMessage());
             }
         }
 

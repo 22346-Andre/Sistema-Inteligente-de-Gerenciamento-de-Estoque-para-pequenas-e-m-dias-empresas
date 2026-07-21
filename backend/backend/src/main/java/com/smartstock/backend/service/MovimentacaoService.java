@@ -1,8 +1,7 @@
 package com.smartstock.backend.service;
 
-import com.smartstock.backend.exception.AcessoNegadoException;
 import com.smartstock.backend.exception.RecursoNaoEncontradoException;
-import com.smartstock.backend.exception.RegraNegocioException;
+
 import com.smartstock.backend.model.Movimentacao;
 import com.smartstock.backend.model.Produto;
 import com.smartstock.backend.model.TipoMovimentacao;
@@ -33,7 +32,7 @@ public class MovimentacaoService {
         Long empresaId = jwt.getClaim("empresaId");
 
         if (empresaId == null) {
-            throw new RuntimeException("Erro: O usuário logado não possui vínculo com nenhuma empresa.");
+            throw new RecursoNaoEncontradoException("Erro: O usuário logado não possui vínculo com nenhuma empresa.");
         }
         return empresaId;
     }
@@ -44,19 +43,7 @@ public class MovimentacaoService {
     }
 
     public List<Movimentacao> listarPorProduto(Long produtoId) {
-        Long empresaId = getEmpresaIdLogada();
-
-        // Garante que o produto existe e pertence à empresa logada antes de
-        // devolver qualquer movimentação (evita vazamento de histórico entre empresas).
-        Produto produto = produtoRepository.findById(produtoId)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Produto não encontrado: id=" + produtoId));
-
-        if (!produto.getEmpresa().getId().equals(empresaId)) {
-            throw new AcessoNegadoException("Operação não permitida para esta empresa!");
-        }
-
-        // Busca já filtrada por produto + empresa (defesa em profundidade,
-        // mesmo que a checagem acima já garanta a posse do produto).
+        // Busca todas as movimentações do produto específico
         return movimentacaoRepository.findByProdutoIdOrderByDataMovimentacaoDesc(produtoId);
     }
 
@@ -64,20 +51,20 @@ public class MovimentacaoService {
     public Movimentacao registrarViaPDV(MovimentacaoPdvDTO dto) {
         Long empresaId = getEmpresaIdLogada(); // Usa a sua função segura do JWT
 
-        // 1. Procura o produto pelo código de barras e garante que é da empresa logada
-        Produto produto = produtoRepository.findByCodigoBarrasAndEmpresaId(dto.getCodigoBarras(), empresaId)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Produto com código " + dto.getCodigoBarras() + " não encontrado no seu estoque."));
+       
+        Produto produto = produtoRepository.buscarPorCodigoBarrasComLockParaAtualizacao(dto.getCodigoBarras(), empresaId)
+                .orElseThrow(() -> new RuntimeException("Produto com código " + dto.getCodigoBarras() + " não encontrado no seu estoque."));
 
 
         if (dto.getTipo().equalsIgnoreCase("SAIDA")) {
             if (produto.getQuantidade() < dto.getQuantidade()) {
-                throw new RegraNegocioException("Estoque insuficiente! Você tentou vender " + dto.getQuantidade() + " mas só tem " + produto.getQuantidade() + " de " + produto.getNome());
+                throw new RuntimeException("Estoque insuficiente! Você tentou vender " + dto.getQuantidade() + " mas só tem " + produto.getQuantidade() + " de " + produto.getNome());
             }
             produto.setQuantidade(produto.getQuantidade() - dto.getQuantidade());
         } else if (dto.getTipo().equalsIgnoreCase("ENTRADA")) {
             produto.setQuantidade(produto.getQuantidade() + dto.getQuantidade());
         } else {
-            throw new RegraNegocioException("Tipo de movimentação inválido.");
+            throw new RuntimeException("Tipo de movimentação inválido.");
         }
 
         // Salva o novo saldo do produto

@@ -1,5 +1,8 @@
 package com.smartstock.backend.service;
 
+import com.smartstock.backend.exception.AcessoNegadoException;
+import com.smartstock.backend.exception.RecursoNaoEncontradoException;
+
 import com.smartstock.backend.dto.FornecedorDTO;
 import com.smartstock.backend.model.Empresa;
 import com.smartstock.backend.model.Fornecedor;
@@ -26,7 +29,7 @@ public class FornecedorService {
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         Long empresaId = jwt.getClaim("empresaId");
         if (empresaId == null) {
-            throw new RuntimeException("Erro: O usuário logado não possui vínculo com nenhuma empresa.");
+            throw new RecursoNaoEncontradoException("Erro: O usuário logado não possui vínculo com nenhuma empresa.");
         }
         return empresaId;
     }
@@ -44,7 +47,7 @@ public class FornecedorService {
     }
 
     Empresa empresa = empresaRepository.findById(empresaId)
-            .orElseThrow(() -> new RuntimeException("Empresa não encontrada"));
+            .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada"));
 
     Fornecedor fornecedor = new Fornecedor();
     fornecedor.setNome(dto.getNome());
@@ -60,10 +63,10 @@ public class FornecedorService {
 
 public Fornecedor atualizar(Long id, FornecedorDTO dto) {
     Fornecedor fornecedor = repository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado"));
+            .orElseThrow(() -> new RecursoNaoEncontradoException("Fornecedor não encontrado"));
 
     if (!fornecedor.getEmpresa().getId().equals(getEmpresaIdLogada())) {
-        throw new RuntimeException("Acesso negado: Este fornecedor pertence a outra empresa.");
+        throw new AcessoNegadoException("Acesso negado: Este fornecedor pertence a outra empresa.");
     }
 
     repository.findByCnpjAndEmpresaId(dto.getCnpj(), getEmpresaIdLogada())
@@ -84,11 +87,11 @@ public Fornecedor atualizar(Long id, FornecedorDTO dto) {
 }
     public void deletar(Long id) {
         Fornecedor fornecedor = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Fornecedor não encontrado"));
 
         // TRAVA DE SEGURANÇA SAAS
         if (!fornecedor.getEmpresa().getId().equals(getEmpresaIdLogada())) {
-            throw new RuntimeException("Acesso negado: Você não pode deletar um fornecedor de outra empresa.");
+            throw new AcessoNegadoException("Acesso negado: Você não pode deletar um fornecedor de outra empresa.");
         }
 
         repository.deleteById(id);

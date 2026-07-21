@@ -1,5 +1,7 @@
 package com.smartstock.backend.service;
 
+import com.smartstock.backend.exception.RecursoNaoEncontradoException;
+
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.Barcode128;
 import com.lowagie.text.pdf.PdfPCell;
@@ -47,10 +49,10 @@ public class RelatorioPdfService {
         Long empresaId = jwt.getClaim("empresaId");
 
         if (empresaId == null) {
-            throw new RuntimeException("Erro: O usuário logado não possui vínculo com nenhuma empresa.");
+            throw new RecursoNaoEncontradoException("Erro: O usuário logado não possui vínculo com nenhuma empresa.");
         }
         return empresaRepository.findById(empresaId)
-                .orElseThrow(() -> new RuntimeException("Empresa não encontrada no banco de dados."));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada no banco de dados."));
     }
     private LocalDateTime[] validarEParsearDatas(String dataInicio, String dataFim) {
         if (dataInicio == null || dataInicio.trim().isEmpty() || dataFim == null || dataFim.trim().isEmpty()) {
@@ -471,7 +473,7 @@ public class RelatorioPdfService {
 
     public byte[] gerarCupomLotePdf(String chaveNotaFiscal) {
         List<Movimentacao> movs = movimentacaoRepository.findByChaveNotaFiscal(chaveNotaFiscal);
-        if (movs.isEmpty()) throw new RuntimeException("Nota não encontrada.");
+        if (movs.isEmpty()) throw new RecursoNaoEncontradoException("Nota não encontrada.");
         return gerarCupomLoteInterno(movs, chaveNotaFiscal);
     }
 
@@ -543,7 +545,7 @@ public class RelatorioPdfService {
 
     public byte[] gerarDanfeLotePdf(String chaveNotaFiscal) {
         List<Movimentacao> movs = movimentacaoRepository.findByChaveNotaFiscal(chaveNotaFiscal);
-        if (movs.isEmpty()) throw new RuntimeException("Nota não encontrada.");
+        if (movs.isEmpty()) throw new RecursoNaoEncontradoException("Nota não encontrada.");
         return construirLayoutDanfe(movs, chaveNotaFiscal);
     }
 

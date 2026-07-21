@@ -33,7 +33,18 @@ public class Empresa {
 
     private LocalDateTime ultimoAcesso = LocalDateTime.now(); // Já começa com a data de hoje ao criar
 
-    
+ 
     @Column(name = "dias_estoque_morto")
     private Integer diasParaEstoqueMorto = 90;
+
+   
+    @Column(name = "webhook_secret", unique = true)
+    private String webhookSecret;
+
+    @PrePersist
+    protected void gerarWebhookSecret() {
+        if (this.webhookSecret == null) {
+            this.webhookSecret = java.util.UUID.randomUUID().toString();
+        }
+    }
 }

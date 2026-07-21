@@ -1,5 +1,7 @@
 package com.smartstock.backend.service;
 
+import com.smartstock.backend.exception.RecursoNaoEncontradoException;
+
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
 import com.opencsv.exceptions.CsvException;
@@ -70,7 +72,7 @@ public class ImportacaoService {
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         Long empresaId = jwt.getClaim("empresaId");
         if (empresaId == null) {
-            throw new RuntimeException("Erro: O usuário logado não possui vínculo com nenhuma empresa.");
+            throw new RecursoNaoEncontradoException("Erro: O usuário logado não possui vínculo com nenhuma empresa.");
         }
         return empresaId;
     }
@@ -119,7 +121,7 @@ public class ImportacaoService {
 
         Long tenantIdAtual = getEmpresaIdLogada();
         Empresa empresaLogada = empresaRepository.findById(tenantIdAtual)
-                .orElseThrow(() -> new RuntimeException("Empresa não encontrada no contexto de segurança."));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada no contexto de segurança."));
 
         // --- Pré-carrega tudo que vai ser consultado repetidamente, para não fazer
         //     1 query por linha do CSV (N+1). Empresas pequenas/médias têm poucos
@@ -398,7 +400,7 @@ public class ImportacaoService {
     public String salvarProdutosLidos(Map<String, Object> dadosLidos) {
         Long empresaId = getEmpresaIdLogada();
         Empresa empresaLogada = empresaRepository.findById(empresaId)
-                .orElseThrow(() -> new RuntimeException("Empresa não encontrada."));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada."));
 
         RelatorioImportacao relatorio = new RelatorioImportacao();
 
@@ -565,18 +567,7 @@ public class ImportacaoService {
                 });
     }
 
-    /**
-     * Resolve o fornecedor de uma linha do CSV a partir do nome e/ou CNPJ informados
-     * (mapas pré-carregados, sem 1 query por linha). Se não encontrar um fornecedor
-     * já cadastrado, CADASTRA um novo automaticamente — igual já acontece com os
-     * produtos — em vez de só avisar e deixar o produto sem vínculo.
-     *
-     * Prioridade de busca/criação: CNPJ (chave mais confiável) e, na ausência dele,
-     * o nome. Quando o fornecedor precisa ser criado só com nome (sem CNPJ na
-     * planilha), o campo cnpj é obrigatório no banco — geramos um placeholder
-     * "PENDENTE-XXXXXXXX" e avisamos no relatório para o gestor completar depois
-     * em Fornecedores.
-     */
+    
     private Fornecedor resolverOuCriarFornecedorCsv(String nomeLido, String cnpjLido,
                                                       Map<String, Fornecedor> fornecedoresPorCnpj,
                                                       Map<String, Fornecedor> fornecedoresPorNome,

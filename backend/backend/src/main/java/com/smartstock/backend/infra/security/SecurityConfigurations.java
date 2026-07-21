@@ -41,6 +41,13 @@ public class SecurityConfigurations {
     @Value("${rsa.private-key}")
     private RSAPrivateKey privateKey;
 
+    // Configurável via application.properties (cors.allowed-origins=url1,url2) ou
+    // variável de ambiente CORS_ALLOWED_ORIGINS — sem precisar recompilar o backend
+    // toda vez que o frontend mudar de domínio (ex: novo preview do Vercel).
+    // O valor abaixo do "=" é só o padrão, usado se a propriedade não for definida.
+    @Value("${cors.allowed-origins:https://frontendrepository-ebon.vercel.app,https://frontendrepository-o4fgcswsg-22346-andres-projects.vercel.app,http://localhost:5173,http://localhost:3000}")
+    private String[] corsAllowedOrigins;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -96,12 +103,7 @@ public class SecurityConfigurations {
         CorsConfiguration configuration = new CorsConfiguration();
 
 
-        configuration.setAllowedOrigins(Arrays.asList(
-                "https://frontendrepository-ebon.vercel.app",
-                "https://frontendrepository-o4fgcswsg-22346-andres-projects.vercel.app",
-                "http://localhost:5173",
-                "http://localhost:3000"
-        ));
+        configuration.setAllowedOrigins(Arrays.asList(corsAllowedOrigins));
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(Arrays.asList("*"));

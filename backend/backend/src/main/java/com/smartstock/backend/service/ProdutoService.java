@@ -1,5 +1,8 @@
 package com.smartstock.backend.service;
 
+import com.smartstock.backend.exception.AcessoNegadoException;
+import com.smartstock.backend.exception.RecursoNaoEncontradoException;
+
 import com.smartstock.backend.dto.LoteDTO;
 import com.smartstock.backend.dto.ProdutoDTO;
 import com.smartstock.backend.model.*;
@@ -40,7 +43,7 @@ public class ProdutoService {
         Long empresaId = jwt.getClaim("empresaId");
 
         if (empresaId == null) {
-            throw new RuntimeException("Erro: O usuário logado não possui vínculo com nenhuma empresa.");
+            throw new RecursoNaoEncontradoException("Erro: O usuário logado não possui vínculo com nenhuma empresa.");
         }
         return empresaId;
     }
@@ -75,7 +78,7 @@ public class ProdutoService {
             return produtos;
         }
 
-       
+        
         produtos.sort((p1, p2) -> {
             BigDecimal v1 = valorEmEstoque(p1);
             BigDecimal v2 = valorEmEstoque(p2);
@@ -83,7 +86,7 @@ public class ProdutoService {
             return cmp != 0 ? cmp : p1.getNome().compareToIgnoreCase(p2.getNome());
         });
 
-      
+        
         BigDecimal acumulado = BigDecimal.ZERO;
         int i = 0;
         while (i < produtos.size()) {
@@ -119,10 +122,10 @@ public class ProdutoService {
     @jakarta.transaction.Transactional
     public Produto buscarPorId(Long id) {
         Produto produto = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Produto não encontrado com o ID: " + id));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Produto não encontrado com o ID: " + id));
 
         if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
-            throw new RuntimeException("Acesso negado: Este produto pertence a outra empresa.");
+            throw new AcessoNegadoException("Acesso negado: Este produto pertence a outra empresa.");
         }
 
         produto.getImpostos().size(); // força o carregamento agora, dentro da transação
@@ -138,7 +141,7 @@ public class ProdutoService {
     public Produto salvar(ProdutoDTO dto) {
         Long empresaIdLogada = getEmpresaIdLogada();
         Empresa empresa = empresaRepository.findById(empresaIdLogada)
-                .orElseThrow(() -> new RuntimeException("Erro: Empresa não encontrada."));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Erro: Empresa não encontrada."));
 
         // A unicidade do nome deve valer só dentro da própria empresa, não no
         // sistema inteiro — senão a Empresa A cadastrar "Arroz" impediria
@@ -179,11 +182,7 @@ public class ProdutoService {
 
         Produto produtoSalvo = repository.save(produto);
 
-        // Gera o rastro (movimentação de ENTRADA) do estoque inicial de cadastro.
-        // Isso garante que os relatórios retroativos (Balanço Geral / Inventário
-        // Fiscal) consigam reconstruir corretamente a quantidade em qualquer data,
-        // sem depender só do campo data_criacao — cada unidade em estoque agora
-        // tem uma movimentação real que explica de onde ela veio.
+        
         if (quantidadeInicial > 0) {
             String cfopOperacao = calcularCfopInterno(TipoMovimentacao.ENTRADA, produtoSalvo);
 
@@ -203,10 +202,10 @@ public class ProdutoService {
     @jakarta.transaction.Transactional
     public Produto atualizar(Long id, ProdutoDTO dto) {
         Produto produto = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Produto não encontrado com o ID: " + id));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Produto não encontrado com o ID: " + id));
 
         if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
-            throw new RuntimeException("Acesso negado: Você não pode alterar um produto de outra empresa.");
+            throw new AcessoNegadoException("Acesso negado: Você não pode alterar um produto de outra empresa.");
         }
 
         Integer quantidadeAntes = produto.getQuantidade() != null ? produto.getQuantidade() : 0;
@@ -236,10 +235,10 @@ public class ProdutoService {
 
         if (dto.getFornecedorId() != null) {
             Fornecedor fornecedor = fornecedorRepository.findById(dto.getFornecedorId())
-                    .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado com ID: " + dto.getFornecedorId()));
+                    .orElseThrow(() -> new RecursoNaoEncontradoException("Fornecedor não encontrado com ID: " + dto.getFornecedorId()));
 
             if (!fornecedor.getEmpresa().getId().equals(getEmpresaIdLogada())) {
-                throw new RuntimeException("Acesso negado: Este fornecedor pertence a outra empresa.");
+                throw new AcessoNegadoException("Acesso negado: Este fornecedor pertence a outra empresa.");
             }
             produto.setFornecedor(fornecedor);
         } else {
@@ -276,10 +275,10 @@ public class ProdutoService {
 
     public void deletar(Long id) {
         Produto produto = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Produto não encontrado com o ID: " + id));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Produto não encontrado com o ID: " + id));
 
         if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
-            throw new RuntimeException("Acesso negado: Você não pode deletar um produto de outra empresa.");
+            throw new AcessoNegadoException("Acesso negado: Você não pode deletar um produto de outra empresa.");
         }
 
         
@@ -313,11 +312,15 @@ public class ProdutoService {
     @jakarta.transaction.Transactional
     public Movimentacao registrarSaida(Long produtoId, Integer quantidadeDesejada, TipoMovimentacao tipo, String motivo, String chaveNotaFiscal) { // 🟢 Adicionamos o 5º parâmetro aqui
 
-        Produto produto = repository.findById(produtoId)
-                .orElseThrow(() -> new RuntimeException("Produto não encontrado"));
+        // Lock pessimista: trava essa linha de produto até o fim da transação, pra
+        // duas baixas de estoque simultâneas no MESMO produto não pisarem uma na
+        // outra (lost update). A segunda requisição fica esperando a primeira
+        // terminar, em vez de ler uma quantidade já desatualizada.
+        Produto produto = repository.buscarComLockParaAtualizacao(produtoId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Produto não encontrado"));
 
         if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
-            throw new RuntimeException("Acesso negado: Você não pode dar baixa em um produto de outra empresa.");
+            throw new AcessoNegadoException("Acesso negado: Você não pode dar baixa em um produto de outra empresa.");
         }
 
         if (produto.getQuantidade() < quantidadeDesejada) {
@@ -367,10 +370,10 @@ public class ProdutoService {
     public Produto adicionarLote(Long produtoId, LoteDTO dto, BigDecimal novoPrecoCompra) {
 
         Produto produto = repository.findById(produtoId)
-                .orElseThrow(() -> new RuntimeException("Produto não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Produto não encontrado"));
 
         if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
-            throw new RuntimeException("Acesso negado: Não pode alterar o estoque de outra empresa.");
+            throw new AcessoNegadoException("Acesso negado: Não pode alterar o estoque de outra empresa.");
         }
 
         int quantidadeAtual = produto.getQuantidade() != null ? produto.getQuantidade() : 0;
