@@ -79,7 +79,9 @@ public class EmpresaController {
         minhaEmpresa.setCidade(dtoAtualizacao.getCidade());
         minhaEmpresa.setEstado(dtoAtualizacao.getEstado());
 
-        
+        // Configuração do painel "Dinheiro Congelado" — só aplica se vier um valor
+        // positivo; um formulário antigo que não manda esse campo (ou manda null/0)
+        // não deve resetar a configuração que o gestor já tinha ajustado.
         if (dtoAtualizacao.getDiasParaEstoqueMorto() != null && dtoAtualizacao.getDiasParaEstoqueMorto() > 0) {
             minhaEmpresa.setDiasParaEstoqueMorto(dtoAtualizacao.getDiasParaEstoqueMorto());
         }
@@ -88,5 +90,22 @@ public class EmpresaController {
         Empresa empresaAtualizada = empresaRepository.save(minhaEmpresa);
 
         return ResponseEntity.ok(empresaAtualizada);
+    }
+
+    
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPER_ADMIN')")
+    @PutMapping("/minha-empresa/webhook-secret")
+    public ResponseEntity<?> regenerarWebhookSecret() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String emailLogado = authentication.getName();
+
+        Usuario usuarioLogado = usuarioRepository.findByEmail(emailLogado)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        Empresa minhaEmpresa = usuarioLogado.getEmpresa();
+        minhaEmpresa.setWebhookSecret(java.util.UUID.randomUUID().toString());
+        empresaRepository.save(minhaEmpresa);
+
+        return ResponseEntity.ok(java.util.Map.of("webhookSecret", minhaEmpresa.getWebhookSecret()));
     }
 }
