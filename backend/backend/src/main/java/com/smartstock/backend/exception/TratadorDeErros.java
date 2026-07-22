@@ -2,6 +2,7 @@ package com.smartstock.backend.exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -78,11 +79,20 @@ public class TratadorDeErros {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(resposta);
     }
 
-    // 6. CAPTURA ERROS GERAIS DO SISTEMA (RuntimeException genérica ainda não migrada
-    // pra uma exceção específica acima). Mantido como rede de segurança — ainda
-    // expõe a mensagem da exceção, então RuntimeExceptions novas devem preferir
-    // uma das exceções específicas acima sempre que a mensagem citar detalhe
-    // interno (nome de empresa, ID, etc.).
+    // 6. VIOLAÇÃO DE INTEGRIDADE REFERENCIAL (Ex: Excluir fornecedor em uso) — 409
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, String>> tratarViolacaoIntegridade(DataIntegrityViolationException ex) {
+        logger.warn("Violação de integridade referencial: {}", ex.getMostSpecificCause().getMessage());
+        
+        Map<String, String> resposta = new HashMap<>();
+        resposta.put("erro", "Não é possível excluir este registro pois ele está vinculado a outros dados do sistema.");
+        
+        // Retorna 409 (Conflict) em vez de 400
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(resposta);
+    }
+
+    // 7. CAPTURA ERROS GERAIS DO SISTEMA (RuntimeException genérica ainda não migrada
+    // pra uma exceção específica acima). Mantido como rede de segurança.
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, String>> tratarErrosDeRegraDeNegocio(RuntimeException ex) {
         Map<String, String> resposta = new HashMap<>();
@@ -92,6 +102,7 @@ public class TratadorDeErros {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(resposta);
     }
 
+    // 8. RESPONSE STATUS EXCEPTION (Tratamento para status HTTP lançados manualmente)
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, String>> tratarResponseStatus(ResponseStatusException ex) {
         Map<String, String> resposta = new HashMap<>();

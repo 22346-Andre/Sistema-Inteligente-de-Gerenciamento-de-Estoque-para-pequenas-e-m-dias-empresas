@@ -464,7 +464,7 @@ public class RelatorioPdfService {
     }
 
 
-    // CUPOM FISCAL DE BOBINA
+  // CUPOM FISCAL DE BOBINA
     public byte[] gerarCupomFiscalPdf(Long movimentacaoId) {
         Movimentacao mov = movimentacaoRepository.findById(movimentacaoId).orElseThrow();
         List<Movimentacao> lista = new ArrayList<>(); lista.add(mov);
@@ -484,7 +484,8 @@ public class RelatorioPdfService {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
 
         try {
-            PdfWriter.getInstance(document, out);
+            PdfWriter writer = PdfWriter.getInstance(document, out);
+            writer.setPageEvent(new MarcaDaguaSemValorFiscal()); // 🔴 NOVO
             document.open();
 
             Font fontTitulo = FontFactory.getFont(FontFactory.COURIER_BOLD, 10);
@@ -558,6 +559,7 @@ public class RelatorioPdfService {
 
         try {
             PdfWriter writer = PdfWriter.getInstance(document, out);
+            writer.setPageEvent(new MarcaDaguaSemValorFiscal()); 
             document.open();
 
             Font fMin = FontFactory.getFont(FontFactory.HELVETICA, 5f);
@@ -609,6 +611,7 @@ public class RelatorioPdfService {
             header.addCell(cDanfe);
 
             PdfPCell cBar = new PdfPCell();
+            cBar.setPadding(4f); 
             cBar.addElement(new Paragraph("CHAVE DE ACESSO", fMin));
 
             // CÓDIGO DE BARRAS NATIVO
@@ -616,8 +619,10 @@ public class RelatorioPdfService {
             // Apenas para não falhar se a chave for muito curta (completa com zeros à esquerda)
             String chaveAjustada = String.format("%44s", chave.replaceAll("[^0-9]", "")).replace(' ', '0');
             barcode.setCode(chaveAjustada);
+            barcode.setFont(null); // 
+            barcode.setBarHeight(30f); 
             Image imgBarcode = barcode.createImageWithBarcode(writer.getDirectContent(), null, null);
-            imgBarcode.scalePercent(110f);
+            imgBarcode.scaleToFit(190f, 40f); 
             imgBarcode.setAlignment(Element.ALIGN_CENTER);
             cBar.addElement(imgBarcode);
 
@@ -732,7 +737,6 @@ public class RelatorioPdfService {
         c.addElement(pVal);
         return c;
     }
-
 
 
     // ═══════════════════════════════════════════════════════════════════════════════

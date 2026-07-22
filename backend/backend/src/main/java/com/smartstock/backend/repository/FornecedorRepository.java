@@ -21,4 +21,5 @@ public interface FornecedorRepository extends JpaRepository<Fornecedor, Long> {
 
     // Conta quantos fornecedores a empresa tem
     long countByEmpresaId(Long empresaId);
+    
 }
