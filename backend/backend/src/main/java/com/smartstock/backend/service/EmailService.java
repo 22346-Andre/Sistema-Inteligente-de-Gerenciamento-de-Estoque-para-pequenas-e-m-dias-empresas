@@ -2,10 +2,12 @@ package com.smartstock.backend.service;
 
 import com.smartstock.backend.dto.SugestaoCompraDTO;
 import jakarta.mail.internet.MimeMessage;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -13,19 +15,28 @@ import java.util.List;
 @Service
 public class EmailService {
 
-    @Autowired
-    private JavaMailSender mailSender;
+    private static final Logger logger = LoggerFactory.getLogger(EmailService.class);
 
-    @Autowired
-    private SugestaoCompraService sugestaoCompraService;
+    private final JavaMailSender mailSender;
+    private final SugestaoCompraService sugestaoCompraService;
 
+    // Injeção via construtor (Clean Code: dependências explícitas e imutáveis)
+    public EmailService(JavaMailSender mailSender, SugestaoCompraService sugestaoCompraService) {
+        this.mailSender = mailSender;
+        this.sugestaoCompraService = sugestaoCompraService;
+    }
+
+    // ========================================================================
+    // MÉTODO 1: E-mail Automático (Monta o texto com o robô e estatísticas)
+    // ========================================================================
+    @Async("emailExecutor")
     public void enviarPlanilhaAutomatica(Long empresaId, String emailDestino) {
         try {
             // 1. O Robô analisa os dados antes de escrever o e-mail
             List<SugestaoCompraDTO> sugestoes = sugestaoCompraService.listarSugestoesPorEmpresa(empresaId);
 
-            long urgentes = sugestoes.stream().filter(s -> s.getUrgencia().equals("URGENTE")).count();
-            long atencao = sugestoes.stream().filter(s -> s.getUrgencia().equals("ATENCAO")).count();
+            long urgentes = sugestoes.stream().filter(s -> "URGENTE".equals(s.getUrgencia())).count();
+            long atencao = sugestoes.stream().filter(s -> "ATENCAO".equals(s.getUrgencia())).count();
             long total = sugestoes.size();
 
             MimeMessage mensagem = mailSender.createMimeMessage();
@@ -39,11 +50,11 @@ public class EmailService {
             String corpoEmail = "Olá, Gestor!\n\n"
                     + "O seu relatório diário de estoque foi gerado com sucesso.\n\n"
                     + "📋 **RESUMO DA SITUAÇÃO:**\n"
-                    + "🔴 " + urgentes + " itens com ESTOQUE ZERADO (Urgente!)\n"
+                    + "🔴 " + urgentes + " itens com ESTOQUE ZERADO ou CRÍTICO (Urgente!)\n"
                     + "🟡 " + atencao + " itens ABAIXO DO MÍNIMO (Atenção)\n"
                     + "📦 Total de itens para reposição: " + total + "\n\n"
                     + "Em anexo, você encontrará a planilha completa com as quantidades exatas "
-                    + "que precisam ser compradas (já com a margem de segurança).\n\n"
+                    + "que precisam ser compradas (já com a margem de segurança e cálculo da IA).\n\n"
                     + "Atenciosamente,\n"
                     + "Robô do SmartStock 🤖";
 
@@ -51,20 +62,24 @@ public class EmailService {
 
             // 3. Anexa a Planilha
             byte[] planilhaBytes = sugestaoCompraService.gerarPlanilhaCsvPorEmpresa(empresaId);
-            ByteArrayResource anexo = new ByteArrayResource(planilhaBytes);
-            helper.addAttachment("Planilha_Compras_SmartStock.csv", anexo);
+            helper.addAttachment("Planilha_Compras_SmartStock.csv", new ByteArrayResource(planilhaBytes));
 
             mailSender.send(mensagem);
-            System.out.println("✅ E-mail com RESUMO enviado para a empresa ID: " + empresaId);
+            logger.info("✅ E-mail automático com RESUMO enviado com sucesso para empresaId={} destino={}", empresaId, emailDestino);
 
         } catch (Exception e) {
-            System.err.println("❌ Erro ao enviar e-mail automático: " + e.getMessage());
+            logger.error("❌ Erro ao enviar e-mail automático para empresaId={} destino={}", empresaId, emailDestino, e);
         }
     }
+
+    // ========================================================================
+    // MÉTODO 2: E-mail Genérico (Recebe o texto direto do Controller)
+    // ========================================================================
+    @Async("emailExecutor")
     public void enviarResumoComPlanilha(String emailDestino, String assunto, String texto, Long empresaId) {
         try {
-            jakarta.mail.internet.MimeMessage mensagem = mailSender.createMimeMessage();
-            org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(mensagem, true, "UTF-8");
+            MimeMessage mensagem = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mensagem, true, "UTF-8");
 
             helper.setFrom("projectstock77@gmail.com");
             helper.setTo(emailDestino);
@@ -73,14 +88,14 @@ public class EmailService {
 
             // Pega a planilha da empresa logada e anexa!
             byte[] planilhaBytes = sugestaoCompraService.gerarPlanilhaCsvPorEmpresa(empresaId);
-            org.springframework.core.io.ByteArrayResource anexo = new org.springframework.core.io.ByteArrayResource(planilhaBytes);
-            helper.addAttachment("Planilha_Compras_SmartStock.csv", anexo);
+            helper.addAttachment("Planilha_Compras_SmartStock.csv", new ByteArrayResource(planilhaBytes));
 
             mailSender.send(mensagem);
-            System.out.println("✅ E-mail Inteligente + Planilha enviado para: " + emailDestino);
+            logger.info("✅ E-mail inteligente enviado com sucesso para empresaId={} destino={}", empresaId, emailDestino);
 
         } catch (Exception e) {
-            System.err.println("❌ Erro ao enviar e-mail inteligente: " + e.getMessage());
+            // Log completo em vez de engolir o erro.
+            logger.error("❌ Falha ao enviar e-mail inteligente para empresaId={} destino={}", empresaId, emailDestino, e);
         }
     }
 }
