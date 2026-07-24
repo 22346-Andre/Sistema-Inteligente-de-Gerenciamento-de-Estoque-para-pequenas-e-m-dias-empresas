@@ -56,15 +56,23 @@ public class MovimentacaoService {
                 .orElseThrow(() -> new RuntimeException("Produto com código " + dto.getCodigoBarras() + " não encontrado no seu estoque."));
 
 
-        if (dto.getTipo().equalsIgnoreCase("SAIDA")) {
+        
+        TipoMovimentacao tipo;
+        try {
+            tipo = TipoMovimentacao.valueOf(dto.getTipo().toUpperCase());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new RuntimeException("Tipo de movimentação inválido.");
+        }
+
+        if (tipo == TipoMovimentacao.SAIDA) {
             if (produto.getQuantidade() < dto.getQuantidade()) {
                 throw new RuntimeException("Estoque insuficiente! Você tentou vender " + dto.getQuantidade() + " mas só tem " + produto.getQuantidade() + " de " + produto.getNome());
             }
             produto.setQuantidade(produto.getQuantidade() - dto.getQuantidade());
-        } else if (dto.getTipo().equalsIgnoreCase("ENTRADA")) {
+        } else if (tipo == TipoMovimentacao.ENTRADA) {
             produto.setQuantidade(produto.getQuantidade() + dto.getQuantidade());
         } else {
-            throw new RuntimeException("Tipo de movimentação inválido.");
+            throw new RuntimeException("Tipo de movimentação inválido para o PDV. Use ENTRADA ou SAIDA.");
         }
 
         // Salva o novo saldo do produto
@@ -74,7 +82,7 @@ public class MovimentacaoService {
         Movimentacao mov = new Movimentacao();
         mov.setProduto(produto);
         mov.setEmpresa(produto.getEmpresa());
-        mov.setTipo(TipoMovimentacao.valueOf(dto.getTipo().toUpperCase()));
+        mov.setTipo(tipo);
         mov.setQuantidade(dto.getQuantidade());
         mov.setDataMovimentacao(java.time.LocalDateTime.now());
 

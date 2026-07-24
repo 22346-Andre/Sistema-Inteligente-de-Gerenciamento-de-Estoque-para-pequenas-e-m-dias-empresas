@@ -1,6 +1,7 @@
 package com.smartstock.backend.config;
 
 import com.smartstock.backend.model.Empresa;
+import com.smartstock.backend.model.Perfis;
 import com.smartstock.backend.model.Usuario;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.UsuarioRepository;
@@ -50,7 +51,7 @@ public class AdminSeeder implements CommandLineRunner {
             //  Usa a variável segura em vez da senha hardcoded
             superAdmin.setSenha(passwordEncoder.encode(senhaAdmin)); 
             
-            superAdmin.setPerfil("SUPER_ADMIN");
+            superAdmin.setPerfil(Perfis.SUPER_ADMIN);
             superAdmin.setEmpresa(hq); // Vincula à Empresa HQ
 
             usuarioRepository.save(superAdmin);

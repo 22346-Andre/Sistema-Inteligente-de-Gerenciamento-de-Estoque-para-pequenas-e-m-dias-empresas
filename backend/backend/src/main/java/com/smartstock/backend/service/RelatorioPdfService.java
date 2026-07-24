@@ -223,7 +223,7 @@ public class RelatorioPdfService {
                 table.addCell(m.getProduto() != null ? m.getProduto().getNome() : "Desconhecido");
 
                 PdfPCell cellTipo = new PdfPCell(new Phrase(m.getTipo() != null ? m.getTipo().name() : "-"));
-                if (m.getTipo() != null && m.getTipo().name().equals("ENTRADA")) {
+                if (m.getTipo() == com.smartstock.backend.model.TipoMovimentacao.ENTRADA) {
                     cellTipo.setBackgroundColor(new Color(204, 255, 204));
                 } else {
                     cellTipo.setBackgroundColor(new Color(255, 204, 204));

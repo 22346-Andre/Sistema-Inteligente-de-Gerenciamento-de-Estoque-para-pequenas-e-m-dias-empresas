@@ -5,17 +5,15 @@ import com.lowagie.text.pdf.*;
 
 import java.awt.Color;
 
-/**
- * Aplica, em toda página do PDF, um selo discreto de "sem valor fiscal" num
- * canto (não atravessa mais a página inteira) + uma faixa fina no topo.
- * Os tamanhos são calculados a partir da largura da própria página, então o
- * mesmo código funciona tanto numa folha A4 (DANFE) quanto numa bobina
- * estreita de cupom, sem estourar nem ficar ilegível em nenhuma das duas.
- */
+
 public class MarcaDaguaSemValorFiscal extends PdfPageEventHelper {
 
-    private static final String CARIMBO = "SEM VALOR FISCAL";
-    private static final String AVISO_FAIXA = "SEM VALOR FISCAL - APENAS DEMONSTRAÇÃO";
+    private static final String AVISO_CURTO = "SEM VALOR FISCAL - DEMONSTRAÇÃO";
+    private static final String AVISO_LONGO = "DOCUMENTO SEM VALOR FISCAL - EMITIDO APENAS PARA FINS DE DEMONSTRAÇÃO E TESTE";
+
+    // Abaixo dessa largura de página consideramos "bobina/cupom" e usamos o
+    // texto curto + fonte ainda menor para caber num canto sem quebrar feio.
+    private static final float LARGURA_LIMITE_BOBINA = 300f;
 
     @Override
     public void onEndPage(PdfWriter writer, Document document) {
@@ -23,36 +21,28 @@ public class MarcaDaguaSemValorFiscal extends PdfPageEventHelper {
         Rectangle pageSize = document.getPageSize();
         float largura = pageSize.getWidth();
 
-       
-        float tamanhoCarimbo = Math.max(7f, Math.min(14f, largura / 20f));
-        Font fontCarimbo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, tamanhoCarimbo, new Color(200, 0, 0));
-        Phrase carimbo = new Phrase(CARIMBO, fontCarimbo);
+        boolean isBobina = largura < LARGURA_LIMITE_BOBINA;
+        String texto = isBobina ? AVISO_CURTO : AVISO_LONGO;
+        float tamanhoFonte = isBobina ? 5.5f : 6.5f;
+
+        Font fonte = FontFactory.getFont(FontFactory.HELVETICA, tamanhoFonte, new Color(150, 150, 150));
+        Phrase marca = new Phrase(texto, fonte);
 
         PdfGState gState = new PdfGState();
-        gState.setFillOpacity(0.35f);
+        gState.setFillOpacity(0.55f);
         canvas.saveState();
         canvas.setGState(gState);
 
-        float margem = 10f;
+        
+        float margemDireita = document.rightMargin();
+        float x = pageSize.getRight() - margemDireita;
+        float y = pageSize.getBottom() + 6f;
+
         ColumnText.showTextAligned(
-                canvas, Element.ALIGN_RIGHT, carimbo,
-                pageSize.getRight() - margem,
-                pageSize.getBottom() + margem,
-                10 // leve inclinação, efeito "carimbo" — sem atravessar o documento
+                canvas, Element.ALIGN_RIGHT, marca,
+                x, y,
+                0 
         );
         canvas.restoreState();
-
-      
-        float tamanhoFaixa = Math.max(6f, Math.min(8f, largura / 40f));
-        Font fontFaixa = FontFactory.getFont(FontFactory.HELVETICA_BOLD, tamanhoFaixa, Color.WHITE);
-        PdfPTable faixa = new PdfPTable(1);
-        faixa.setTotalWidth(largura - document.leftMargin() - document.rightMargin());
-        PdfPCell celula = new PdfPCell(new Phrase(AVISO_FAIXA, fontFaixa));
-        celula.setBackgroundColor(new Color(200, 0, 0));
-        celula.setHorizontalAlignment(Element.ALIGN_CENTER);
-        celula.setPadding(2f);
-        celula.setBorder(Rectangle.NO_BORDER);
-        faixa.addCell(celula);
-        faixa.writeSelectedRows(0, -1, document.leftMargin(), pageSize.getHeight() - 6, canvas);
     }
 }

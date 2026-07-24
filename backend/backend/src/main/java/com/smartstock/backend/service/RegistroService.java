@@ -2,6 +2,7 @@ package com.smartstock.backend.service;
 
 import com.smartstock.backend.dto.RegistroEmpresaDTO;
 import com.smartstock.backend.model.Empresa;
+import com.smartstock.backend.model.Perfis;
 import com.smartstock.backend.model.Usuario;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.UsuarioRepository;
@@ -50,7 +51,7 @@ public class RegistroService {
         admin.setEmail(dto.getEmail());
         // Usa o nome atualizado: getSenha()
         admin.setSenha(passwordEncoder.encode(dto.getSenha()));
-        admin.setPerfil("ADMIN");
+        admin.setPerfil(Perfis.ADMIN);
         admin.setTelefone(dto.getTelefoneAdmin());
         admin.setEmpresa(novaEmpresa);
         admin.setDono(true); // Este é o único momento em que "dono" é marcado como true.

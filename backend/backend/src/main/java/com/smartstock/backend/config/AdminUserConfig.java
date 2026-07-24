@@ -1,5 +1,6 @@
 package com.smartstock.backend.config;
 
+import com.smartstock.backend.model.Perfis;
 import com.smartstock.backend.model.Usuario;
 import com.smartstock.backend.repository.UsuarioRepository;
 import org.springframework.boot.CommandLineRunner;
@@ -30,7 +31,7 @@ public class AdminUserConfig implements CommandLineRunner {
                     user.setNome("Administrador");
                     user.setEmail("admin@smartstock.com");
                     user.setSenha(passwordEncoder.encode("123456")); // Senha padrão
-                    user.setPerfil("ADMIN");
+                    user.setPerfil(Perfis.ADMIN);
                     userRepository.save(user);
                     System.out.println("Admin criado com sucesso!");
                 }

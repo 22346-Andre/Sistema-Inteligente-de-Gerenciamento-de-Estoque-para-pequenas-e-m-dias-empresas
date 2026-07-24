@@ -36,7 +36,9 @@ public interface MovimentacaoRepository extends JpaRepository<Movimentacao, Long
     // MÉTODO QUE FALTAVA ADICIONADO AQUI:
     List<Movimentacao> findByProdutoIdAndDataMovimentacaoBetween(Long produtoId, LocalDateTime dataInicio, LocalDateTime dataFim);
 
-    List<Movimentacao> findByChaveNotaFiscal(String chaveNotaFiscal);
+   
+    @Query("SELECT m FROM Movimentacao m JOIN FETCH m.produto WHERE m.chaveNotaFiscal = :chaveNotaFiscal")
+    List<Movimentacao> findByChaveNotaFiscal(@Param("chaveNotaFiscal") String chaveNotaFiscal);
 
     @Modifying
     @Query("DELETE FROM Movimentacao m WHERE m.dataMovimentacao < :dataLimite")

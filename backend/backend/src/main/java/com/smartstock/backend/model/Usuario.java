@@ -51,7 +51,7 @@ public class Usuario implements UserDetails {
     @JsonIgnore
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        if (this.perfil != null && this.perfil.equals("ADMIN")) {
+        if (this.perfil != null && this.perfil.equals(Perfis.ADMIN)) {
             return List.of(new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("ROLE_USER"));
         }
         return List.of(new SimpleGrantedAuthority("ROLE_USER"));

@@ -6,6 +6,7 @@ import com.smartstock.backend.exception.RecursoNaoEncontradoException;
 import com.smartstock.backend.dto.AlterarSenhaDTO;
 import com.smartstock.backend.dto.AtualizarPerfilDTO;
 import com.smartstock.backend.dto.UsuarioDTO;
+import com.smartstock.backend.model.Perfis;
 import com.smartstock.backend.model.Usuario;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.UsuarioRepository;
@@ -45,7 +46,7 @@ public class UsuarioService {
 
     public List<Usuario> listarTodos() {
         Usuario logado = getUsuarioLogado();
-        if ("SUPER_ADMIN".equals(logado.getPerfil())) {
+        if (Perfis.SUPER_ADMIN.equals(logado.getPerfil())) {
             return repository.findAll();
         }
         return repository.findByEmpresaId(logado.getEmpresa().getId());
@@ -57,7 +58,7 @@ public class UsuarioService {
 
         if (usuarioOpt.isPresent()) {
             Usuario usuario = usuarioOpt.get();
-            if (!"SUPER_ADMIN".equals(logado.getPerfil()) && !usuario.getEmpresa().getId().equals(logado.getEmpresa().getId())) {
+            if (!Perfis.SUPER_ADMIN.equals(logado.getPerfil()) && !usuario.getEmpresa().getId().equals(logado.getEmpresa().getId())) {
                 throw new AcessoNegadoException("Acesso negado: Este usuário pertence a outra empresa.");
             }
         }
@@ -92,7 +93,7 @@ public class UsuarioService {
         usuario.setSenha(passwordEncoder.encode(dto.getSenha()));
         usuario.setTelefone(dto.getTelefone());
 
-        if ("SUPER_ADMIN".equals(dto.getPerfil())) {
+        if (Perfis.SUPER_ADMIN.equals(dto.getPerfil())) {
             throw new AcessoNegadoException("Acesso negado: Você não tem permissão para criar um SUPER_ADMIN.");
         }
 
@@ -111,11 +112,11 @@ public class UsuarioService {
             throw new RuntimeException("Ação Proibida: A conta do Dono da empresa é protegida e não pode ser editada.");
         }
 
-        if ("SUPER_ADMIN".equals(usuarioAlvo.getPerfil()) && !"SUPER_ADMIN".equals(adminLogado.getPerfil())) {
+        if (Perfis.SUPER_ADMIN.equals(usuarioAlvo.getPerfil()) && !Perfis.SUPER_ADMIN.equals(adminLogado.getPerfil())) {
             throw new RuntimeException("Ação Proibida: Você não tem permissão para editar um Super Administrador.");
         }
 
-        if (!"SUPER_ADMIN".equals(adminLogado.getPerfil())) {
+        if (!Perfis.SUPER_ADMIN.equals(adminLogado.getPerfil())) {
             if (!usuarioAlvo.getEmpresa().getId().equals(adminLogado.getEmpresa().getId())) {
                 throw new AcessoNegadoException("Acesso negado: Empresa divergente.");
             }
@@ -132,7 +133,7 @@ public class UsuarioService {
         // Somente um SUPER_ADMIN pode promover outra pessoa a SUPER_ADMIN.
         // Sem essa checagem, um ADMIN comum conseguiria se auto-promover indiretamente
         // promovendo um colega e depois pedindo para esse colega alterá-lo.
-        if ("SUPER_ADMIN".equals(dto.getPerfil()) && !"SUPER_ADMIN".equals(adminLogado.getPerfil())) {
+        if (Perfis.SUPER_ADMIN.equals(dto.getPerfil()) && !Perfis.SUPER_ADMIN.equals(adminLogado.getPerfil())) {
             throw new AcessoNegadoException("Acesso negado: Você não tem permissão para atribuir o perfil SUPER_ADMIN.");
         }
 
@@ -153,7 +154,7 @@ public class UsuarioService {
             throw new RuntimeException("Ação Bloqueada: O Dono (criador) da empresa não pode ser removido do sistema.");
         }
 
-        if ("SUPER_ADMIN".equals(usuarioAlvo.getPerfil()) && !"SUPER_ADMIN".equals(adminLogado.getPerfil())) {
+        if (Perfis.SUPER_ADMIN.equals(usuarioAlvo.getPerfil()) && !Perfis.SUPER_ADMIN.equals(adminLogado.getPerfil())) {
             throw new RuntimeException("Ação Bloqueada: Você não tem autoridade para excluir um Super Administrador.");
         }
 
@@ -161,7 +162,7 @@ public class UsuarioService {
             throw new RuntimeException("Você não pode deletar sua própria conta.");
         }
 
-        if (!"SUPER_ADMIN".equals(adminLogado.getPerfil()) && !usuarioAlvo.getEmpresa().getId().equals(adminLogado.getEmpresa().getId())) {
+        if (!Perfis.SUPER_ADMIN.equals(adminLogado.getPerfil()) && !usuarioAlvo.getEmpresa().getId().equals(adminLogado.getEmpresa().getId())) {
             throw new AcessoNegadoException("Acesso negado.");
         }
 
