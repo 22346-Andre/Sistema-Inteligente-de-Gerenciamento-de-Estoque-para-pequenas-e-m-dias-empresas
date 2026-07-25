@@ -42,6 +42,17 @@ public class Usuario implements UserDetails {
     @Column(name = "dono", nullable = false)
     private boolean dono = false;
 
+    // 🟢 NOVO: campos do fluxo "Esqueci minha senha". Token opaco (UUID) com
+    // validade curta — @JsonIgnore pra nunca vazar no JSON de resposta de
+    // nenhum endpoint que devolva Usuario (ex.: /usuarios).
+    @JsonIgnore
+    @Column(name = "reset_senha_token")
+    private String resetSenhaToken;
+
+    @JsonIgnore
+    @Column(name = "reset_senha_expiracao")
+    private java.time.LocalDateTime resetSenhaExpiracao;
+
     public boolean isLoginCorrect(LoginRequest loginRequest, PasswordEncoder passwordEncoder) {
         return passwordEncoder.matches(loginRequest.senha(), this.senha);
     }

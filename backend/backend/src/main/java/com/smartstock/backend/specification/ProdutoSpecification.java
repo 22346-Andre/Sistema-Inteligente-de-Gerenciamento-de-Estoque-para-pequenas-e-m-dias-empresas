@@ -33,6 +33,17 @@ public class ProdutoSpecification {
         };
     }
 
+    
+    public static Specification<Produto> nomeOuCodigoBarrasContem(String termo) {
+        return (root, query, criteriaBuilder) -> {
+            String termoLower = "%" + termo.toLowerCase() + "%";
+            return criteriaBuilder.or(
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("nome")), termoLower),
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("codigoBarras")), termoLower)
+            );
+        };
+    }
+
     // 4. Filtro por Data de Atualização (Ex: Produtos alterados desde o dia 10)
     public static Specification<Produto> atualizadoApos(LocalDateTime data) {
         return (root, query, criteriaBuilder) ->

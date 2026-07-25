@@ -69,47 +69,37 @@ public class ProdutoService {
         return "0.000";
     }
 
+    
+    public org.springframework.data.domain.Page<Produto> listarPaginado(int page, int size, String busca) {
+        Long empresaId = getEmpresaIdLogada();
+
+        org.springframework.data.jpa.domain.Specification<Produto> spec =
+                ProdutoSpecification.pertenceAEmpresa(empresaId);
+
+        if (busca != null && !busca.isBlank()) {
+            spec = spec.and(ProdutoSpecification.nomeOuCodigoBarrasContem(busca.trim()));
+        }
+
+        int pageSeguro = Math.max(0, page);
+        int sizeSeguro = Math.min(Math.max(1, size), 200); // trava contra ?size=999999
+
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                pageSeguro, sizeSeguro,
+                org.springframework.data.domain.Sort.by("nome").ascending()
+        );
+
+        return repository.findAll(spec, pageable);
+    }
+    // listarTodos() — inclusive do Scanner/PDV e do Dashboard, que chamam isso a
+    // cada carregamento de tela — recalculava a Curva ABC inteira do zero, pelo
+    // critério ERRADO (capital parado em estoque, ver CurvaAbcService). Além de
+    // caro (sort + 2 passadas sobre todo o catálogo em toda requisição), a
+    // classificação não tinha nem uso real nessa tela. Curva ABC agora vive só
+    // em GET /estatisticas/curva-abc, calculada sob demanda quando o gestor
+    // realmente abre esse painel — não em toda listagem de produto do sistema.
     public List<Produto> listarTodos() {
         Long empresaId = getEmpresaIdLogada();
-        List<Produto> produtos = repository.findByEmpresaId(empresaId);
-        BigDecimal totalEstoque = repository.calcularValorTotalEstoque(empresaId);
-
-        if (totalEstoque == null || totalEstoque.compareTo(BigDecimal.ZERO) == 0) {
-            return produtos;
-        }
-
-        
-        produtos.sort((p1, p2) -> {
-            BigDecimal v1 = valorEmEstoque(p1);
-            BigDecimal v2 = valorEmEstoque(p2);
-            int cmp = v2.compareTo(v1);
-            return cmp != 0 ? cmp : p1.getNome().compareToIgnoreCase(p2.getNome());
-        });
-
-        
-        BigDecimal acumulado = BigDecimal.ZERO;
-        int i = 0;
-        while (i < produtos.size()) {
-            BigDecimal valorDoBloco = valorEmEstoque(produtos.get(i));
-            int fimBloco = i;
-            while (fimBloco < produtos.size() && valorEmEstoque(produtos.get(fimBloco)).compareTo(valorDoBloco) == 0) {
-                fimBloco++;
-            }
-
-            int quantidadeNoBloco = fimBloco - i;
-            acumulado = acumulado.add(valorDoBloco.multiply(BigDecimal.valueOf(quantidadeNoBloco)));
-            double percentual = acumulado.divide(totalEstoque, 4, RoundingMode.HALF_UP).doubleValue() * 100;
-
-            String classe = percentual <= 80.0 ? "A" : percentual <= 95.0 ? "B" : "C";
-            for (int k = i; k < fimBloco; k++) {
-                produtos.get(k).setClassificacaoABC(classe);
-            }
-
-            i = fimBloco;
-        }
-
-        produtos.sort(Comparator.comparing(Produto::getNome));
-        return produtos;
+        return repository.findByEmpresaId(empresaId);
     }
 
     /** Valor total do produto parado em estoque: custo unitário × quantidade. Usado na Curva ABC. */

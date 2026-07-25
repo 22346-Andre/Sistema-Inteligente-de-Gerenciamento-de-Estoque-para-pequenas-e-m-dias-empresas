@@ -98,4 +98,34 @@ public class EmailService {
             logger.error("❌ Falha ao enviar e-mail inteligente para empresaId={} destino={}", empresaId, emailDestino, e);
         }
     }
+
+    // ========================================================================
+    // MÉTODO 3: 🟢 NOVO — E-mail de recuperação de senha (link com token)
+    // ========================================================================
+    @Async("emailExecutor")
+    public void enviarEmailRecuperacaoSenha(String emailDestino, String nomeDono, String linkRecuperacao) {
+        try {
+            MimeMessage mensagem = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mensagem, true, "UTF-8");
+
+            helper.setFrom("projectstock77@gmail.com");
+            helper.setTo(emailDestino);
+            helper.setSubject("🔑 Recuperação de senha - SmartStock");
+
+            String corpoEmail = "Olá" + (nomeDono != null && !nomeDono.isBlank() ? ", " + nomeDono : "") + "!\n\n"
+                    + "Recebemos um pedido para redefinir a sua senha no SmartStock.\n\n"
+                    + "Clique no link abaixo para escolher uma nova senha. Esse link é válido por 1 hora:\n\n"
+                    + linkRecuperacao + "\n\n"
+                    + "Se você não pediu essa redefinição, pode ignorar este e-mail com segurança — "
+                    + "sua senha atual continua válida e nada foi alterado.\n\n"
+                    + "Atenciosamente,\n"
+                    + "Equipe SmartStock 🔒";
+
+            helper.setText(corpoEmail);
+            mailSender.send(mensagem);
+            logger.info("✅ E-mail de recuperação de senha enviado para destino={}", emailDestino);
+        } catch (Exception e) {
+            logger.error("❌ Falha ao enviar e-mail de recuperação de senha para destino={}", emailDestino, e);
+        }
+    }
 }

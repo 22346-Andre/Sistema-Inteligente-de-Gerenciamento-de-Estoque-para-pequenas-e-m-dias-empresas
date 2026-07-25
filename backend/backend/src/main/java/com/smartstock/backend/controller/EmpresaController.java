@@ -86,6 +86,9 @@ public class EmpresaController {
             minhaEmpresa.setDiasParaEstoqueMorto(dtoAtualizacao.getDiasParaEstoqueMorto());
         }
 
+      
+        minhaEmpresa.setChavePix(dtoAtualizacao.getChavePix());
+
         // Salva a alteração no banco de dados
         Empresa empresaAtualizada = empresaRepository.save(minhaEmpresa);
 

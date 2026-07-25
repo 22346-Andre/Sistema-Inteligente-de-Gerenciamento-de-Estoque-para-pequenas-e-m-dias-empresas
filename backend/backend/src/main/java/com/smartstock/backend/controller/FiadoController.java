@@ -57,6 +57,13 @@ public class FiadoController {
         return ResponseEntity.ok(Map.of("linkWhatsApp", link));
     }
 
+    
+    @GetMapping("/{id}/pix")
+    public ResponseEntity<Map<String, String>> obterPix(@PathVariable Long id) {
+        String copiaECola = fiadoService.gerarCobrancaPix(id, getEmpresaIdLogada());
+        return ResponseEntity.ok(Map.of("copiaECola", copiaECola));
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<ContaReceber> atualizar(@PathVariable Long id, @RequestBody ContaReceberDTO dto) {
         Long empresaId = getEmpresaIdLogada();

@@ -17,4 +17,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     long countByEmpresaIdAndPerfil(Long empresaId, String perfil);
 
     Optional<Usuario> findFirstByEmpresaIdOrderByIdAsc(Long empresaId);
+
+    //  usado no fluxo de "Esqueci minha senha"
+    Optional<Usuario> findByResetSenhaToken(String resetSenhaToken);
 }

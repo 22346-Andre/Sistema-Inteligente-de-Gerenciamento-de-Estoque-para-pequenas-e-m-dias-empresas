@@ -41,6 +41,10 @@ public class Empresa {
     @Column(name = "webhook_secret", unique = true)
     private String webhookSecret;
 
+   
+    @Column(name = "chave_pix")
+    private String chavePix;
+
     @PrePersist
     protected void gerarWebhookSecret() {
         if (this.webhookSecret == null) {

@@ -26,6 +26,15 @@ public class ProdutoController {
         return service.listarTodos();
     }
 
+   
+    @GetMapping("/paginado")
+    public ResponseEntity<org.springframework.data.domain.Page<Produto>> listarPaginado(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size,
+            @RequestParam(required = false) String busca) {
+        return ResponseEntity.ok(service.listarPaginado(page, size, busca));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Produto> buscarPorId(@PathVariable Long id) {
         Produto produto = service.buscarPorId(id);

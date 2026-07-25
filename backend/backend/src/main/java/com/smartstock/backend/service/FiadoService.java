@@ -21,10 +21,12 @@ public class FiadoService {
 
     private final ContaReceberRepository contaRepository;
     private final EmpresaRepository empresaRepository;
+    private final PixService pixService;
 
-    public FiadoService(ContaReceberRepository contaRepository, EmpresaRepository empresaRepository) {
+    public FiadoService(ContaReceberRepository contaRepository, EmpresaRepository empresaRepository, PixService pixService) {
         this.contaRepository = contaRepository;
         this.empresaRepository = empresaRepository;
+        this.pixService = pixService;
     }
 
     public ContaReceber registrarFiado(Long empresaId, ContaReceberDTO dto) {
@@ -78,6 +80,20 @@ public class FiadoService {
 
         String textoCodificado = URLEncoder.encode(mensagem, StandardCharsets.UTF_8);
         return "https://wa.me/" + telefoneLimpo + "?text=" + textoCodificado;
+    }
+
+    
+    public String gerarCobrancaPix(Long id, Long empresaId) {
+        ContaReceber conta = buscarContaDaEmpresa(id, empresaId);
+        Empresa empresa = conta.getEmpresa();
+
+        return pixService.gerarCopiaECola(
+                empresa.getChavePix(),
+                empresa.getNomeFantasia() != null ? empresa.getNomeFantasia() : empresa.getRazaoSocial(),
+                empresa.getCidade(),
+                conta.getValor(),
+                "FIADO" + conta.getId()
+        );
     }
 
     public List<ContaReceber> buscarClientesParaCobrar(Long empresaId) {

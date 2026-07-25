@@ -59,6 +59,8 @@ public class SecurityConfigurations {
                         .requestMatchers(HttpMethod.POST, "/auth/registrar-empresa").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/webhooks/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/login/google").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/esqueci-senha").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/redefinir-senha").permitAll()
                         .requestMatchers(HttpMethod.GET, "/wakeup").permitAll()
                         .anyRequest().authenticated())
 

@@ -1,12 +1,16 @@
 package com.smartstock.backend.controller;
 
-import com.smartstock.backend.dto.GoogleLoginDTO; // 🚨 Não esqueça de importar o DTO novo!
+import com.smartstock.backend.dto.EsqueciSenhaDTO;
+import com.smartstock.backend.dto.GoogleLoginDTO; 
 import com.smartstock.backend.dto.LoginRequest;
 import com.smartstock.backend.dto.LoginResponse;
+import com.smartstock.backend.dto.RedefinirSenhaDTO;
 import com.smartstock.backend.dto.RegistroEmpresaDTO;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.UsuarioRepository;
-import com.smartstock.backend.service.AuthService; // 🚨 Importando o novo serviço do Google
+import com.smartstock.backend.service.AuthService; 
+import com.smartstock.backend.service.LoginAttemptService;
+import com.smartstock.backend.service.PasswordResetService;
 import com.smartstock.backend.service.RegistroService;
 import com.smartstock.backend.service.TokenService;
 import jakarta.validation.Valid;
@@ -40,6 +44,12 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
+    @Autowired
+    private LoginAttemptService loginAttemptService;
+
+    @Autowired
+    private PasswordResetService passwordResetService;
+
     // --- ROTA PÚblica DE CADASTRO DA EMPRESA E DO DONO ---
     @PostMapping("/registrar-empresa")
     public ResponseEntity<String> registrar(@RequestBody @Valid RegistroEmpresaDTO dto) {
@@ -51,11 +61,17 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest loginRequest) {
 
+        
+        loginAttemptService.verificarBloqueio(loginRequest.email());
+
         var userOptional = userRepository.findByEmail(loginRequest.email());
 
         if (userOptional.isEmpty() || !userOptional.get().isLoginCorrect(loginRequest, passwordEncoder)) {
+            loginAttemptService.registrarFalha(loginRequest.email());
             throw new BadCredentialsException("Usuário ou senha inválidos!");
         }
+
+        loginAttemptService.registrarSucesso(loginRequest.email());
 
         var user = userOptional.get();
 
@@ -83,5 +99,19 @@ public class AuthController {
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+   
+    @PostMapping("/esqueci-senha")
+    public ResponseEntity<String> esqueciSenha(@RequestBody @Valid EsqueciSenhaDTO dto) {
+        passwordResetService.solicitarRecuperacao(dto.email());
+        return ResponseEntity.ok("Se esse e-mail estiver cadastrado, você vai receber um link de recuperação em instantes.");
+    }
+
+   
+    @PostMapping("/redefinir-senha")
+    public ResponseEntity<String> redefinirSenha(@RequestBody @Valid RedefinirSenhaDTO dto) {
+        passwordResetService.redefinirSenha(dto.token(), dto.novaSenha());
+        return ResponseEntity.ok("Senha redefinida com sucesso! Você já pode entrar com a nova senha.");
     }
 }

@@ -54,4 +54,28 @@ Integer sumSaidasPorProdutoUltimosDias(@Param("produtoId") Long produtoId,
     // pra dizer desde quando o dinheiro está parado naquele item.
     @Query("SELECT MAX(m.dataMovimentacao) FROM Movimentacao m WHERE m.produto.id = :produtoId AND m.tipo = 'SAIDA'")
     LocalDateTime buscarDataUltimaVenda(@Param("produtoId") Long produtoId);
+
+    
+    @Query("SELECT m.produto.id, SUM(m.quantidade * COALESCE(m.produto.precoVenda, m.produto.precoCusto, 0)) " +
+           "FROM Movimentacao m " +
+           "WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataInicio " +
+           "GROUP BY m.produto.id")
+    List<Object[]> somarFaturamentoPorProdutoNoPeriodo(@Param("empresaId") Long empresaId, @Param("dataInicio") LocalDateTime dataInicio);
+
+    //  mesma coisa, mas pela MARGEM (lucro = venda - custo) em vez do
+    // faturamento bruto — usado na visão "ABC por Lucratividade".
+    @Query("SELECT m.produto.id, SUM(m.quantidade * (COALESCE(m.produto.precoVenda, 0) - COALESCE(m.produto.precoCusto, 0))) " +
+           "FROM Movimentacao m " +
+           "WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataInicio " +
+           "GROUP BY m.produto.id")
+    List<Object[]> somarLucroPorProdutoNoPeriodo(@Param("empresaId") Long empresaId, @Param("dataInicio") LocalDateTime dataInicio);
+
+    //  contagem de unidades vendidas por produto no período — usado na
+    // visão "ABC por Volume de Giro" (útil pra organizar o layout do estoque:
+    // itens de giro alto ficam mais perto do caixa/expedição).
+    @Query("SELECT m.produto.id, SUM(m.quantidade) " +
+           "FROM Movimentacao m " +
+           "WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataInicio " +
+           "GROUP BY m.produto.id")
+    List<Object[]> somarVolumeVendidoPorProdutoNoPeriodo(@Param("empresaId") Long empresaId, @Param("dataInicio") LocalDateTime dataInicio);
 }
