@@ -82,11 +82,24 @@ public class TratadorDeErros {
     // 6. VIOLAÇÃO DE INTEGRIDADE REFERENCIAL (Ex: Excluir fornecedor em uso) — 409
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, String>> tratarViolacaoIntegridade(DataIntegrityViolationException ex) {
-        logger.warn("Violação de integridade referencial: {}", ex.getMostSpecificCause().getMessage());
-        
+        String causaRaiz = ex.getMostSpecificCause().getMessage();
+        logger.warn("Violação de integridade referencial: {}", causaRaiz);
+
         Map<String, String> resposta = new HashMap<>();
-        resposta.put("erro", "Não é possível excluir este registro pois ele está vinculado a outros dados do sistema.");
-        
+
+       
+        boolean violacaoDeUnicidade = causaRaiz != null && (
+                causaRaiz.toLowerCase().contains("duplicate entry")
+                        || causaRaiz.toLowerCase().contains("unique constraint")
+                        || causaRaiz.toLowerCase().contains("violates unique")
+        );
+
+        if (violacaoDeUnicidade) {
+            resposta.put("erro", "Já existe um registro com esse mesmo valor (e-mail, CNPJ ou código de barras já cadastrado).");
+        } else {
+            resposta.put("erro", "Não é possível excluir este registro pois ele está vinculado a outros dados do sistema.");
+        }
+
         // Retorna 409 (Conflict) em vez de 400
         return ResponseEntity.status(HttpStatus.CONFLICT).body(resposta);
     }
