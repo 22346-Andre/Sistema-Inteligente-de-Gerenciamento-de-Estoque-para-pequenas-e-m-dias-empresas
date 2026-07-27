@@ -4,6 +4,7 @@ import com.smartstock.backend.dto.SugestaoCompraDTO;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -19,6 +20,16 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
     private final SugestaoCompraService sugestaoCompraService;
+
+    // 🟢 CORRIGIDO: antes o "De:" era hardcoded como literal
+    // "projectstock77@gmail.com" em 4 lugares diferentes, mesmo que
+    // spring.mail.username estivesse configurado com OUTRA conta (via variável
+    // de ambiente MAIL_USERNAME no Render). O Gmail (e a maioria dos provedores
+    // SMTP) REJEITA o envio quando o "De:" não é a mesma conta autenticada — e
+    // isso falhava silenciosamente, caindo no catch que só loga o erro. Agora
+    // o remetente é sempre a mesma conta configurada, nunca dessincroniza.
+    @Value("${spring.mail.username}")
+    private String emailRemetente;
 
     // Injeção via construtor (Clean Code: dependências explícitas e imutáveis)
     public EmailService(JavaMailSender mailSender, SugestaoCompraService sugestaoCompraService) {
@@ -42,7 +53,7 @@ public class EmailService {
             MimeMessage mensagem = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mensagem, true, "UTF-8");
 
-            helper.setFrom("projectstock77@gmail.com");
+            helper.setFrom(emailRemetente);
             helper.setTo(emailDestino);
             helper.setSubject("📊 Resumo de Estoque e Sugestões de Compra - SmartStock");
 
@@ -81,7 +92,7 @@ public class EmailService {
             MimeMessage mensagem = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mensagem, true, "UTF-8");
 
-            helper.setFrom("projectstock77@gmail.com");
+            helper.setFrom(emailRemetente);
             helper.setTo(emailDestino);
             helper.setSubject(assunto);
             helper.setText(texto);
@@ -108,7 +119,7 @@ public class EmailService {
             MimeMessage mensagem = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mensagem, true, "UTF-8");
 
-            helper.setFrom("projectstock77@gmail.com");
+            helper.setFrom(emailRemetente);
             helper.setTo(emailDestino);
             helper.setSubject("🔑 Recuperação de senha - SmartStock");
 
@@ -127,5 +138,22 @@ public class EmailService {
         } catch (Exception e) {
             logger.error("❌ Falha ao enviar e-mail de recuperação de senha para destino={}", emailDestino, e);
         }
+    }
+
+    // ========================================================================
+    // 🟢 NOVO: teste de e-mail SÍNCRONO (propositalmente SEM @Async) — usado só
+    // pelo endpoint de diagnóstico GET /admin/testar-email. Diferente dos
+    // métodos acima, este PROPAGA a exceção (não engole com try/catch) pra o
+    // controller conseguir devolver o erro real na resposta HTTP, em vez de o
+    // erro sumir silenciosamente numa thread assíncrona + log que ninguém vê.
+    // ========================================================================
+    public void enviarEmailTeste(String emailDestino) throws Exception {
+        MimeMessage mensagem = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(mensagem, true, "UTF-8");
+        helper.setFrom(emailRemetente);
+        helper.setTo(emailDestino);
+        helper.setSubject("✅ Teste de e-mail - SmartStock");
+        helper.setText("Se você recebeu isto, o envio de e-mail está funcionando corretamente.");
+        mailSender.send(mensagem);
     }
 }
