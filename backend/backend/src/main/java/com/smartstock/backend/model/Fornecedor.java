@@ -23,7 +23,12 @@ public class Fornecedor {
     private String endereco;
 
     @Column(name = "prazo_entrega_dias")
-    private Integer prazoEntregaDias; 
+    private Integer prazoEntregaDias;
+
+   
+    @Column(name = "categorias_fornecidas")
+    private String categoriasFornecidas;
+
     @ManyToOne
     @JoinColumn(name = "empresa_id", nullable = false)
     private Empresa empresa;

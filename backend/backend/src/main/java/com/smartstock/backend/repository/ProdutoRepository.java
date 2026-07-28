@@ -20,6 +20,11 @@ public interface ProdutoRepository extends JpaRepository<Produto, Long>, JpaSpec
 
     List<Produto> findByEmpresaId(Long empresaId);
 
+   
+    @Query("SELECT DISTINCT p.categoria FROM Produto p WHERE p.empresa.id = :empresaId " +
+           "AND p.categoria IS NOT NULL AND p.categoria <> '' ORDER BY p.categoria ASC")
+    List<String> findCategoriasDistintasPorEmpresa(@Param("empresaId") Long empresaId);
+
     
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Produto p WHERE p.id = :id")

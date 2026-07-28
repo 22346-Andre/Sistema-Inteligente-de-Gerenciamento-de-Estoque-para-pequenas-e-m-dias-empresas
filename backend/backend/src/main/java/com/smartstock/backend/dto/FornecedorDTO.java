@@ -23,4 +23,7 @@ public class FornecedorDTO {
     @Min(value = 0, message = "Prazo de entrega não pode ser negativo")
     @Max(value = 90, message = "Prazo de entrega parece muito alto, confira o valor")
     private Integer prazoEntregaDias; // opcional — se null, o sistema assume 7 dias no cálculo de urgência
+
+    
+    private String categoriasFornecidas;
 }

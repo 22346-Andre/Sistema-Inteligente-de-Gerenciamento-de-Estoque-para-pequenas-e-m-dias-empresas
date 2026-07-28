@@ -2,7 +2,7 @@ package com.smartstock.backend.controller;
 
 import com.smartstock.backend.dto.ProdutoDTO;
 import com.smartstock.backend.model.Produto;
-import com.smartstock.backend.model.Movimentacao; // 🟢 Import da Movimentacao adicionado
+import com.smartstock.backend.model.Movimentacao; 
 import com.smartstock.backend.service.ProdutoService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,8 +31,15 @@ public class ProdutoController {
     public ResponseEntity<org.springframework.data.domain.Page<Produto>> listarPaginado(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size,
-            @RequestParam(required = false) String busca) {
-        return ResponseEntity.ok(service.listarPaginado(page, size, busca));
+            @RequestParam(required = false) String busca,
+            @RequestParam(required = false) String categoria) {
+        return ResponseEntity.ok(service.listarPaginado(page, size, busca, categoria));
+    }
+
+    
+    @GetMapping("/categorias")
+    public ResponseEntity<List<String>> listarCategorias() {
+        return ResponseEntity.ok(service.listarCategoriasDistintas());
     }
 
     @GetMapping("/{id}")

@@ -62,6 +62,7 @@ public class FornecedorService {
         fornecedor.setEmail(dto.getEmail());
         fornecedor.setEndereco(dto.getEndereco());
         fornecedor.setPrazoEntregaDias(dto.getPrazoEntregaDias());
+        fornecedor.setCategoriasFornecidas(dto.getCategoriasFornecidas());
         fornecedor.setEmpresa(empresa);
 
         return repository.save(fornecedor);
@@ -88,6 +89,7 @@ public class FornecedorService {
         fornecedor.setEmail(dto.getEmail());
         fornecedor.setEndereco(dto.getEndereco());
         fornecedor.setPrazoEntregaDias(dto.getPrazoEntregaDias());
+        fornecedor.setCategoriasFornecidas(dto.getCategoriasFornecidas());
 
         return repository.save(fornecedor);
     }

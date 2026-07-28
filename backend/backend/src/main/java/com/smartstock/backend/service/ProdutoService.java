@@ -70,7 +70,7 @@ public class ProdutoService {
     }
 
     
-    public org.springframework.data.domain.Page<Produto> listarPaginado(int page, int size, String busca) {
+    public org.springframework.data.domain.Page<Produto> listarPaginado(int page, int size, String busca, String categoria) {
         Long empresaId = getEmpresaIdLogada();
 
         org.springframework.data.jpa.domain.Specification<Produto> spec =
@@ -78,6 +78,11 @@ public class ProdutoService {
 
         if (busca != null && !busca.isBlank()) {
             spec = spec.and(ProdutoSpecification.nomeOuCodigoBarrasContem(busca.trim()));
+        }
+
+       
+        if (categoria != null && !categoria.isBlank()) {
+            spec = spec.and(ProdutoSpecification.categoriaContem(categoria.trim()));
         }
 
         int pageSeguro = Math.max(0, page);
@@ -89,6 +94,12 @@ public class ProdutoService {
         );
 
         return repository.findAll(spec, pageable);
+    }
+
+    
+    public java.util.List<String> listarCategoriasDistintas() {
+        Long empresaId = getEmpresaIdLogada();
+        return repository.findCategoriasDistintasPorEmpresa(empresaId);
     }
     // listarTodos() — inclusive do Scanner/PDV e do Dashboard, que chamam isso a
     // cada carregamento de tela — recalculava a Curva ABC inteira do zero, pelo

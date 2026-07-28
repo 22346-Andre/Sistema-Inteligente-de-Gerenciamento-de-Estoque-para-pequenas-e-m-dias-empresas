@@ -1,0 +1,1 @@
+ALTER TABLE fornecedores ADD COLUMN categorias_fornecidas VARCHAR(500);
