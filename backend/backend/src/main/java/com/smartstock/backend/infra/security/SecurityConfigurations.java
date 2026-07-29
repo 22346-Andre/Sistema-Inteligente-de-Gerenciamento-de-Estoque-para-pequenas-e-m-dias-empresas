@@ -41,10 +41,7 @@ public class SecurityConfigurations {
     @Value("${rsa.private-key}")
     private RSAPrivateKey privateKey;
 
-    // Configurável via application.properties (cors.allowed-origins=url1,url2) ou
-    // variável de ambiente CORS_ALLOWED_ORIGINS — sem precisar recompilar o backend
-    // toda vez que o frontend mudar de domínio (ex: novo preview do Vercel).
-    // O valor abaixo do "=" é só o padrão, usado se a propriedade não for definida.
+    
     @Value("${cors.allowed-origins:https://frontendrepository-ebon.vercel.app,https://frontendrepository-o4fgcswsg-22346-andres-projects.vercel.app,http://localhost:5173,http://localhost:3000}")
     private String[] corsAllowedOrigins;
 
@@ -61,6 +58,8 @@ public class SecurityConfigurations {
                         .requestMatchers(HttpMethod.POST, "/auth/login/google").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/esqueci-senha").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/redefinir-senha").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/confirmar-cadastro").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/reenviar-codigo-cadastro").permitAll()
                         .requestMatchers(HttpMethod.GET, "/wakeup").permitAll()
                         .anyRequest().authenticated())
 

@@ -23,9 +23,11 @@ public class RegistroService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @Transactional
-    public String registrarNovaEmpresa(RegistroEmpresaDTO dto) {
-        // Usa o nome atualizado: getEmail()
+    // extraído pra ser reaproveitado ANTES de mandar o código de
+    // verificação (VerificacaoCadastroService) — não faz sentido gastar um
+    // envio de e-mail/código pra um cadastro que já ia falhar de qualquer jeito
+    // por e-mail ou CNPJ duplicado.
+    public void validarDisponibilidade(RegistroEmpresaDTO dto) {
         if (usuarioRepository.findByEmail(dto.getEmail()).isPresent()) {
             throw new RuntimeException("Este e-mail já está em uso por outro usuário!");
         }
@@ -33,6 +35,11 @@ public class RegistroService {
         if (empresaRepository.existsByCnpj(dto.getCnpj())) {
             throw new RuntimeException("Já existe uma empresa cadastrada com este CNPJ!");
         }
+    }
+
+    @Transactional
+    public String registrarNovaEmpresa(RegistroEmpresaDTO dto) {
+        validarDisponibilidade(dto);
 
         Empresa novaEmpresa = new Empresa();
         // Usa o nome atualizado: getRazaoSocial()

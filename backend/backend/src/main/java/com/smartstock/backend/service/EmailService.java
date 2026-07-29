@@ -138,6 +138,19 @@ public class EmailService {
         }
     }
 
+    
+    public void enviarCodigoVerificacaoCadastro(String emailDestino, String nomeDono, String codigo) throws Exception {
+        String corpoEmail = "Ola" + (nomeDono != null && !nomeDono.isBlank() ? ", " + nomeDono : "") + "!\n\n"
+                + "Use o codigo abaixo para confirmar seu e-mail e concluir o cadastro no SmartStock:\n\n"
+                + "        " + codigo + "\n\n"
+                + "Esse codigo e valido por 15 minutos. Se voce nao solicitou este cadastro, pode ignorar este e-mail.\n\n"
+                + "Atenciosamente,\n"
+                + "Equipe SmartStock";
+
+        enviarViaBrevo(emailDestino, "Seu codigo de confirmacao - SmartStock", corpoEmail, null, null);
+        logger.info("Codigo de verificacao de cadastro enviado para destino={}", emailDestino);
+    }
+
     // ========================================================================
     // METODO 3: E-mail de recuperacao de senha (link com token)
     // ========================================================================
