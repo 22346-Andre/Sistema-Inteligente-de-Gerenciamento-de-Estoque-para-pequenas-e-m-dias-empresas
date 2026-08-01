@@ -57,7 +57,9 @@ public class EmpresaController {
         return ResponseEntity.ok(usuarioLogado.getEmpresa());
     }
 
-    // 2. PUT: Atualiza os dados da empresa do usuário logado
+   
+    // ADMIN/SUPER_ADMIN podem editar.
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPER_ADMIN')")
     @PutMapping("/minha-empresa")
     public ResponseEntity<Empresa> atualizarMinhaEmpresa(@RequestBody Empresa dtoAtualizacao) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
