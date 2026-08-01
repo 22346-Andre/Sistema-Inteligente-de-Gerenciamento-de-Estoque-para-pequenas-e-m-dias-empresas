@@ -35,6 +35,9 @@ public class SugestaoCompraService {
     @Autowired
     private FuzzyUrgenciaService fuzzyUrgenciaService;
 
+    @Autowired
+    private FornecedorService fornecedorService;
+
     private Long getEmpresaIdLogada() {
         if (SecurityContextHolder.getContext().getAuthentication() == null ||
                 !(SecurityContextHolder.getContext().getAuthentication().getPrincipal() instanceof Jwt)) {
@@ -53,6 +56,13 @@ public class SugestaoCompraService {
         List<SugestaoCompraDTO> sugestoes = new ArrayList<>();
         LocalDateTime dataInicio = LocalDateTime.now().minusDays(30);
 
+        // cache local do prazo observado por fornecedor — sem isso,
+        // N produtos do MESMO fornecedor disparariam a mesma query de prazo
+        // real N vezes seguidas na mesma requisição. Usa Optional porque
+        // Map.computeIfAbsent NÃO cacheia quando a função devolve null (o que
+        // aconteceria toda vez pra um fornecedor sem histórico suficiente).
+        Map<Long, java.util.Optional<Double>> prazoObservadoPorFornecedor = new java.util.HashMap<>();
+
         for (Produto p : produtosCriticos) {
             int atual = p.getQuantidade() != null ? p.getQuantidade() : 0;
             int minimo = p.getEstoqueMinimo() != null ? p.getEstoqueMinimo() : 0;
@@ -63,11 +73,36 @@ public class SugestaoCompraService {
             Integer saidas30dias = movimentacaoRepository.sumSaidasPorProdutoUltimosDias(p.getId(), dataInicio);
             double giroVendas = saidas30dias != null ? saidas30dias : 0.0;
 
+            
             Integer prazoFornecedor = (p.getFornecedor() != null) ? p.getFornecedor().getPrazoEntregaDias() : null;
-            double prazoEntregaDias = prazoFornecedor != null ? prazoFornecedor : PRAZO_ENTREGA_PADRAO_DIAS;
+            Double prazoObservado = null;
+            if (p.getFornecedor() != null) {
+                Long fornecedorId = p.getFornecedor().getId();
+                prazoObservado = prazoObservadoPorFornecedor
+                        .computeIfAbsent(fornecedorId, id -> java.util.Optional.ofNullable(
+                                fornecedorService.calcularPrazoEntregaObservado(id, empresaId)))
+                        .orElse(null);
+            }
 
-            // --- Avaliação fuzzy ---
+            double prazoEntregaDias;
+            String prazoEntregaOrigem;
+            if (prazoObservado != null) {
+                prazoEntregaDias = prazoObservado;
+                prazoEntregaOrigem = "OBSERVADO";
+            } else if (prazoFornecedor != null) {
+                prazoEntregaDias = prazoFornecedor;
+                prazoEntregaOrigem = "CONFIGURADO";
+            } else {
+                prazoEntregaDias = PRAZO_ENTREGA_PADRAO_DIAS;
+                prazoEntregaOrigem = "PADRAO";
+            }
+
             double grauUrgencia = fuzzyUrgenciaService.calcularUrgencia(nivelEstoquePct, giroVendas, prazoEntregaDias);
+
+           
+            if (atual == 0) {
+                grauUrgencia = Math.max(grauUrgencia, 85.0);
+            }
 
             // --- Monta o DTO ---
             SugestaoCompraDTO dto = new SugestaoCompraDTO();
@@ -82,6 +117,14 @@ public class SugestaoCompraService {
             dto.setQuantidadeAtual(atual);
             dto.setEstoqueMinimo(minimo);
             dto.setGrauUrgencia(Math.round(grauUrgencia * 10.0) / 10.0); // 1 casa decimal
+
+            
+            dto.setNivelEstoqueLabel(classificarNivelEstoque(nivelEstoquePct));
+            dto.setGiroVendas((int) Math.round(giroVendas));
+            dto.setGiroVendasLabel(classificarGiro(giroVendas));
+            dto.setPrazoEntregaDias(Math.round(prazoEntregaDias * 10.0) / 10.0);
+            dto.setPrazoEntregaLabel(classificarPrazo(prazoEntregaDias));
+            dto.setPrazoEntregaOrigem(prazoEntregaOrigem);
 
             // Estoque zerado é sempre URGENTE, independente do fuzzy (regra de negócio dura)
             dto.setUrgencia(atual == 0 ? "URGENTE" : (grauUrgencia >= 55 ? "URGENTE" : "ATENCAO"));
@@ -183,4 +226,30 @@ public class SugestaoCompraService {
 
     return resultado;
   }
+
+    // ========================================================================
+    // classificadores de rótulo pra explicabilidade na tela (tooltip
+    // "Por que comprar?"). Os pontos de corte usados aqui são os mesmos picos
+    // das funções de pertinência do FuzzyUrgenciaService — não recalculam
+    // nada do motor fuzzy, só traduzem os valores numéricos brutos (nível de
+    // estoque em %, giro em unidades/mês, prazo em dias) num rótulo legível
+    // pro gestor. O grau de urgência em si continua saindo 100% do fuzzy.
+    // ========================================================================
+    private String classificarNivelEstoque(double percentualDoMinimo) {
+        if (percentualDoMinimo < 50) return "Baixo";
+        if (percentualDoMinimo <= 150) return "Adequado";
+        return "Alto";
+    }
+
+    private String classificarGiro(double unidadesUltimos30Dias) {
+        if (unidadesUltimos30Dias < 30) return "Lento";
+        if (unidadesUltimos30Dias <= 60) return "Moderado";
+        return "Rápido";
+    }
+
+    private String classificarPrazo(double dias) {
+        if (dias <= 5) return "Rápido";
+        if (dias <= 15) return "Aceitável";
+        return "Demorado";
+    }
 }

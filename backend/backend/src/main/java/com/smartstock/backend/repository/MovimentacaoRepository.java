@@ -78,4 +78,13 @@ Integer sumSaidasPorProdutoUltimosDias(@Param("produtoId") Long produtoId,
            "WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataInicio " +
            "GROUP BY m.produto.id")
     List<Object[]> somarVolumeVendidoPorProdutoNoPeriodo(@Param("empresaId") Long empresaId, @Param("dataInicio") LocalDateTime dataInicio);
+    //  datas de todas as ENTRADAS de produtos de um fornecedor, em
+    // ordem cronológica — base para calcular o prazo de entrega REAL
+    // observado (intervalo médio entre entradas consecutivas), em vez de
+    // depender só do valor fixo digitado manualmente no cadastro do
+    // fornecedor. Usado por FornecedorService.calcularPrazoEntregaObservado().
+    @Query("SELECT m.dataMovimentacao FROM Movimentacao m " +
+           "WHERE m.produto.fornecedor.id = :fornecedorId AND m.empresa.id = :empresaId AND m.tipo = 'ENTRADA' " +
+           "ORDER BY m.dataMovimentacao ASC")
+    List<LocalDateTime> findDatasEntradaPorFornecedor(@Param("fornecedorId") Long fornecedorId, @Param("empresaId") Long empresaId);
 }

@@ -16,4 +16,14 @@ public class SugestaoCompraDTO {
     private BigDecimal valorUnitario;
     private BigDecimal valorTotal;
     private String telefoneFornecedor;
+
+  
+    private String nivelEstoqueLabel;   // "Baixo" | "Adequado" | "Alto"
+    private Integer giroVendas;          // unidades vendidas nos últimos 30 dias
+    private String giroVendasLabel;      // "Lento" | "Moderado" | "Rápido"
+    private Double prazoEntregaDias;
+    private String prazoEntregaLabel;    // "Rápido" | "Aceitável" | "Demorado"
+
+    
+    private String prazoEntregaOrigem;
 }
