@@ -7,6 +7,6 @@ import java.util.List;
 public class VendaExternaDTO {
     private String origem; // Ex: "MERCADO_LIVRE", "SHOPIFY"
     private String idPedido;
-    private Long empresaId;
+   
     private List<ItemVendaExternaDTO> itens;
 }

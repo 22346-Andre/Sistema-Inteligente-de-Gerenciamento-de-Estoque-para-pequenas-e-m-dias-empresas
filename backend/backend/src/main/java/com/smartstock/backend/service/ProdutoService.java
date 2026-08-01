@@ -312,6 +312,30 @@ public class ProdutoService {
 
     @jakarta.transaction.Transactional
     public Movimentacao registrarSaida(Long produtoId, Integer quantidadeDesejada, TipoMovimentacao tipo, String motivo, String chaveNotaFiscal) { // 🟢 Adicionamos o 5º parâmetro aqui
+        return registrarSaidaInterno(produtoId, quantidadeDesejada, tipo, motivo, chaveNotaFiscal, getEmpresaIdLogada());
+    }
+
+    //  — bug crítico: o Webhook (rota pública, sem JWT — ver
+    // SecurityConfigurations, /api/webhooks/** é permitAll) chamava
+    // registrarSaida() diretamente, que por baixo dos panos sempre chama
+    // getEmpresaIdLogada(). Sem usuário autenticado, SecurityContextHolder traz
+    // um Authentication anônimo cujo getPrincipal() é a STRING "anonymousUser",
+    // não um Jwt — o cast (Jwt) explodia com ClassCastException em TODA venda
+    // vinda de canal externo, sempre, silenciosamente engolida pelo catch
+    // genérico do WebhookService. Ou seja, nenhuma baixa de estoque via
+    // Webhook jamais funcionou de verdade.
+    //
+    // Esta variante recebe a empresa já validada por fora (pelo segredo do
+    // Webhook, nunca por JWT) e não depende do contexto de segurança —
+    // usada exclusivamente pelo WebhookService.
+    @jakarta.transaction.Transactional
+    public Movimentacao registrarSaidaComEmpresa(Long produtoId, Integer quantidadeDesejada, TipoMovimentacao tipo,
+                                                  String motivo, String chaveNotaFiscal, Long empresaId) {
+        return registrarSaidaInterno(produtoId, quantidadeDesejada, tipo, motivo, chaveNotaFiscal, empresaId);
+    }
+
+    private Movimentacao registrarSaidaInterno(Long produtoId, Integer quantidadeDesejada, TipoMovimentacao tipo,
+                                                String motivo, String chaveNotaFiscal, Long empresaIdDono) {
 
         // Lock pessimista: trava essa linha de produto até o fim da transação, pra
         // duas baixas de estoque simultâneas no MESMO produto não pisarem uma na
@@ -320,7 +344,7 @@ public class ProdutoService {
         Produto produto = repository.buscarComLockParaAtualizacao(produtoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Produto não encontrado"));
 
-        if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
+        if (!produto.getEmpresa().getId().equals(empresaIdDono)) {
             throw new AcessoNegadoException("Acesso negado: Você não pode dar baixa em um produto de outra empresa.");
         }
 
