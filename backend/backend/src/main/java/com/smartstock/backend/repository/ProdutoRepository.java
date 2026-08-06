@@ -48,8 +48,15 @@ public interface ProdutoRepository extends JpaRepository<Produto, Long>, JpaSpec
     @Query("SELECT COALESCE(SUM(p.precoCusto * p.quantidade), 0) FROM Produto p WHERE p.empresa.id = :empresaId")
     BigDecimal calcularValorTotalEstoque(@Param("empresaId") Long empresaId);
 
-    // ALERTA 3: Produtos encalhados (com estoque > 0, mas sem saída recente)
-    @Query("SELECT p FROM Produto p WHERE p.empresa.id = :empresaId AND p.quantidade > 0 AND p.id NOT IN " +
+    // ALERTA 3: Produtos encalhados (com estoque > 0, mas sem saída recente).
+    //  soma a condição "p.dataCriacao <= :dataLimite" pra não marcar
+    // como morto um produto que acabou de ser cadastrado e ainda nem teve tempo
+    // de vender — sem venda alguma, o prazo tem que contar a partir do cadastro,
+    // não do fato de "não vendeu na janela" (que é trivialmente verdade pra
+    // qualquer produto novo).
+    @Query("SELECT p FROM Produto p WHERE p.empresa.id = :empresaId AND p.quantidade > 0 " +
+            "AND p.dataCriacao <= :dataLimite " +
+            "AND p.id NOT IN " +
             "(SELECT m.produto.id FROM Movimentacao m WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataLimite)")
     List<Produto> findProdutosEncalhados(@Param("empresaId") Long empresaId, @Param("dataLimite") LocalDateTime dataLimite);
 

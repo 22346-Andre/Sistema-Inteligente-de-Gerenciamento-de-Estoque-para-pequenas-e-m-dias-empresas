@@ -35,4 +35,9 @@ public class Movimentacao {
 
     @Column(length = 44)
     private String chaveNotaFiscal;
+
+    //  Forma de pagamento da venda (só preenchido em SAIDA feita pelo PDV).
+    @Enumerated(EnumType.STRING)
+    @Column(name = "forma_pagamento", length = 20)
+    private FormaPagamento formaPagamento;
 }

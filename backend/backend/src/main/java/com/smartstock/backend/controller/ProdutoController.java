@@ -96,7 +96,8 @@ public class ProdutoController {
                 dto.getQuantidadeDesejada(),
                 dto.getTipo(),
                 dto.getMotivo(),
-                dto.getChaveNotaFiscal()
+                dto.getChaveNotaFiscal(),
+                dto.getFormaPagamento()
         );
         return ResponseEntity.ok(movSalva);
     }

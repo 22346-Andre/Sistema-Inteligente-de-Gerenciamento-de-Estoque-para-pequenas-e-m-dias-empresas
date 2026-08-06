@@ -115,6 +115,7 @@ public class WebhookService {
                 TipoMovimentacao.SAIDA,
                 "Venda Externa: " + origem,
                 chaveVendaExterna,
+                null, // 🆕 venda externa via Webhook não tem forma de pagamento capturada no PDV
                 empresa.getId()
         );
     }

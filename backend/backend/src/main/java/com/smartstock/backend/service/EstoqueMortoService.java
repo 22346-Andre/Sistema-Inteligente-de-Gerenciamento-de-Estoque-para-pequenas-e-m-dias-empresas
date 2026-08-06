@@ -82,8 +82,12 @@ public class EstoqueMortoService {
 
             LocalDateTime ultimaVenda = movimentacaoRepository.buscarDataUltimaVenda(p.getId());
             if (ultimaVenda == null) {
-                dto.setDiasSemVenda(null);
-                dto.setDataUltimaVendaLabel("Nunca vendeu");
+                // nunca vendeu -> conta os dias a partir da DATA DE CADASTRO
+                // em vez de deixar o contador nulo/parado em "Nunca vendeu".
+                LocalDateTime referencia = p.getDataCriacao() != null ? p.getDataCriacao() : agora;
+                long dias = ChronoUnit.DAYS.between(referencia, agora);
+                dto.setDiasSemVenda((int) dias);
+                dto.setDataUltimaVendaLabel("nunca vendeu · cadastrado há " + dias + " dias (" + formatarMesAno(referencia) + ")");
             } else {
                 long dias = ChronoUnit.DAYS.between(ultimaVenda, agora);
                 dto.setDiasSemVenda((int) dias);

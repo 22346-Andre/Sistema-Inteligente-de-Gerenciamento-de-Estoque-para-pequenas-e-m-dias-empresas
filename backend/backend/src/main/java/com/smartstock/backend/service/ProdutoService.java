@@ -311,8 +311,8 @@ public class ProdutoService {
     }
 
     @jakarta.transaction.Transactional
-    public Movimentacao registrarSaida(Long produtoId, Integer quantidadeDesejada, TipoMovimentacao tipo, String motivo, String chaveNotaFiscal) { // 🟢 Adicionamos o 5º parâmetro aqui
-        return registrarSaidaInterno(produtoId, quantidadeDesejada, tipo, motivo, chaveNotaFiscal, getEmpresaIdLogada());
+    public Movimentacao registrarSaida(Long produtoId, Integer quantidadeDesejada, TipoMovimentacao tipo, String motivo, String chaveNotaFiscal, FormaPagamento formaPagamento) { // 🟢 Adicionamos o 6º parâmetro aqui
+        return registrarSaidaInterno(produtoId, quantidadeDesejada, tipo, motivo, chaveNotaFiscal, formaPagamento, getEmpresaIdLogada());
     }
 
     //  — bug crítico: o Webhook (rota pública, sem JWT — ver
@@ -330,12 +330,12 @@ public class ProdutoService {
     // usada exclusivamente pelo WebhookService.
     @jakarta.transaction.Transactional
     public Movimentacao registrarSaidaComEmpresa(Long produtoId, Integer quantidadeDesejada, TipoMovimentacao tipo,
-                                                  String motivo, String chaveNotaFiscal, Long empresaId) {
-        return registrarSaidaInterno(produtoId, quantidadeDesejada, tipo, motivo, chaveNotaFiscal, empresaId);
+                                                  String motivo, String chaveNotaFiscal, FormaPagamento formaPagamento, Long empresaId) {
+        return registrarSaidaInterno(produtoId, quantidadeDesejada, tipo, motivo, chaveNotaFiscal, formaPagamento, empresaId);
     }
 
     private Movimentacao registrarSaidaInterno(Long produtoId, Integer quantidadeDesejada, TipoMovimentacao tipo,
-                                                String motivo, String chaveNotaFiscal, Long empresaIdDono) {
+                                                String motivo, String chaveNotaFiscal, FormaPagamento formaPagamento, Long empresaIdDono) {
 
         // Lock pessimista: trava essa linha de produto até o fim da transação, pra
         // duas baixas de estoque simultâneas no MESMO produto não pisarem uma na
@@ -387,6 +387,7 @@ public class ProdutoService {
 
 
         mov.setChaveNotaFiscal(chaveNotaFiscal);
+        mov.setFormaPagamento(formaPagamento); // 🆕
 
         return movimentacaoRepository.save(mov);
     }
