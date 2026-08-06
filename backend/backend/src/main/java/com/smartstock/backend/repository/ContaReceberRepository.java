@@ -23,4 +23,7 @@ public interface ContaReceberRepository extends JpaRepository<ContaReceber, Long
 
     // Para o Scheduler de atualizar Status
     List<ContaReceber> findByStatusAndDataVencimentoLessThanEqual(StatusConta status, LocalDate data);
+
+    // Usado pelo webhook da Delfinance pra achar qual fiado foi pago
+    java.util.Optional<ContaReceber> findByPixCorrelationId(String pixCorrelationId);
 }

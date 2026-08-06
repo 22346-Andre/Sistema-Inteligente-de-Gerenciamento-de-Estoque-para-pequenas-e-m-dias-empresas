@@ -8,6 +8,8 @@ import com.smartstock.backend.model.Empresa;
 import com.smartstock.backend.model.StatusConta;
 import com.smartstock.backend.repository.ContaReceberRepository;
 import com.smartstock.backend.repository.EmpresaRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.net.URLEncoder;
@@ -19,14 +21,19 @@ import java.util.List;
 @Service
 public class FiadoService {
 
+    private static final Logger logger = LoggerFactory.getLogger(FiadoService.class);
+
     private final ContaReceberRepository contaRepository;
     private final EmpresaRepository empresaRepository;
     private final PixService pixService;
+    private final DelfinanceClient delfinanceClient;
 
-    public FiadoService(ContaReceberRepository contaRepository, EmpresaRepository empresaRepository, PixService pixService) {
+    public FiadoService(ContaReceberRepository contaRepository, EmpresaRepository empresaRepository,
+                         PixService pixService, DelfinanceClient delfinanceClient) {
         this.contaRepository = contaRepository;
         this.empresaRepository = empresaRepository;
         this.pixService = pixService;
+        this.delfinanceClient = delfinanceClient;
     }
 
     public ContaReceber registrarFiado(Long empresaId, ContaReceberDTO dto) {
@@ -87,6 +94,21 @@ public class FiadoService {
         ContaReceber conta = buscarContaDaEmpresa(id, empresaId);
         Empresa empresa = conta.getEmpresa();
 
+        if (delfinanceClient.isEnabled()) {
+            try {
+                String correlationId = "FIADO-" + conta.getId();
+                DelfinanceClient.CobrancaPix cobranca = delfinanceClient.criarCobrancaDinamica(conta.getValor(), correlationId);
+
+                conta.setPixCorrelationId(cobranca.correlationId());
+                contaRepository.save(conta);
+
+                return cobranca.copiaECola();
+            } catch (Exception e) {
+                logger.warn("Falha ao gerar cobrança Pix via Delfinance pro fiado #{} — caindo pro Pix estático.", id, e);
+                // segue pro fallback abaixo em vez de propagar o erro pro lojista
+            }
+        }
+
         return pixService.gerarCopiaECola(
                 empresa.getChavePix(),
                 empresa.getNomeFantasia() != null ? empresa.getNomeFantasia() : empresa.getRazaoSocial(),
@@ -94,6 +116,21 @@ public class FiadoService {
                 conta.getValor(),
                 "FIADO" + conta.getId()
         );
+    }
+
+    // 🆕 Chamado pelo DelfinanceWebhookController quando chega um evento
+    // PIX_RECEIVED. Marca a conta como paga automaticamente, sem exigir
+    // login/JWT (o webhook é uma rota pública autenticada por segredo).
+    public void marcarComoPagoPorCorrelationId(String correlationId) {
+        contaRepository.findByPixCorrelationId(correlationId).ifPresentOrElse(conta -> {
+            if (conta.getStatus() == StatusConta.PAGO) {
+                logger.info("Webhook Delfinance: fiado #{} já estava marcado como pago, ignorando.", conta.getId());
+                return;
+            }
+            conta.setStatus(StatusConta.PAGO);
+            contaRepository.save(conta);
+            logger.info("Webhook Delfinance: fiado #{} marcado como pago automaticamente (correlationId={}).", conta.getId(), correlationId);
+        }, () -> logger.warn("Webhook Delfinance: nenhum fiado encontrado para correlationId={}", correlationId));
     }
 
     public List<ContaReceber> buscarClientesParaCobrar(Long empresaId) {

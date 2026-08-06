@@ -315,16 +315,8 @@ public class ProdutoService {
         return registrarSaidaInterno(produtoId, quantidadeDesejada, tipo, motivo, chaveNotaFiscal, formaPagamento, getEmpresaIdLogada());
     }
 
-    //  — bug crítico: o Webhook (rota pública, sem JWT — ver
-    // SecurityConfigurations, /api/webhooks/** é permitAll) chamava
-    // registrarSaida() diretamente, que por baixo dos panos sempre chama
-    // getEmpresaIdLogada(). Sem usuário autenticado, SecurityContextHolder traz
-    // um Authentication anônimo cujo getPrincipal() é a STRING "anonymousUser",
-    // não um Jwt — o cast (Jwt) explodia com ClassCastException em TODA venda
-    // vinda de canal externo, sempre, silenciosamente engolida pelo catch
-    // genérico do WebhookService. Ou seja, nenhuma baixa de estoque via
-    // Webhook jamais funcionou de verdade.
-    //
+   
+    
     // Esta variante recebe a empresa já validada por fora (pelo segredo do
     // Webhook, nunca por JWT) e não depende do contexto de segurança —
     // usada exclusivamente pelo WebhookService.
@@ -387,7 +379,7 @@ public class ProdutoService {
 
 
         mov.setChaveNotaFiscal(chaveNotaFiscal);
-        mov.setFormaPagamento(formaPagamento); // 🆕
+        mov.setFormaPagamento(formaPagamento); // 
 
         return movimentacaoRepository.save(mov);
     }

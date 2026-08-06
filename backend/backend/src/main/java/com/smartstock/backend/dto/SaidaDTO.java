@@ -12,5 +12,5 @@ public class SaidaDTO {
     private TipoMovimentacao tipo;
     private String motivo;
     private String chaveNotaFiscal;
-    private FormaPagamento formaPagamento; // 🆕 forma de pagamento escolhida no PDV
+    private FormaPagamento formaPagamento; //  forma de pagamento escolhida no PDV
 }

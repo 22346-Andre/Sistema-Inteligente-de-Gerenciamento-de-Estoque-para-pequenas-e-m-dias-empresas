@@ -1,0 +1,69 @@
+package com.smartstock.backend.controller;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.smartstock.backend.service.FiadoService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+/**
+ * Rota pública (sem JWT — POST /api/webhooks/** já é permitAll em
+ * SecurityConfigurations, ver WebhookController) que recebe os eventos Pix
+ * da Delfinance (https://docs.delbank.com.br/pt/Webhooks/).
+ *
+ * Configure essa URL no painel da Delfinance (ou via POST /baas/api/v1/webhooks
+ * com eventType "PIX_RECEIVED") apontando pra:
+ *   https://<seu-backend>/api/webhooks/delfinance/pix
+ * usando authorizationScheme "HEADER" com o mesmo valor de
+ * delfinance.webhook-secret configurado aqui.
+ *
+ * Autenticação: header X-Delfinance-Webhook-Secret — segredo compartilhado
+ * (não por empresa, porque a conta Delfinance é uma só, do SmartStock).
+ */
+@RestController
+@RequestMapping("/api/webhooks/delfinance")
+public class DelfinanceWebhookController {
+
+    private static final Logger logger = LoggerFactory.getLogger(DelfinanceWebhookController.class);
+
+    private final FiadoService fiadoService;
+
+    @Value("${delfinance.webhook-secret:}")
+    private String webhookSecretConfigurado;
+
+    public DelfinanceWebhookController(FiadoService fiadoService) {
+        this.fiadoService = fiadoService;
+    }
+
+    @PostMapping("/pix")
+    public ResponseEntity<?> receberEventoPix(
+            @RequestBody JsonNode corpo,
+            @RequestHeader(value = "X-Delfinance-Webhook-Secret", required = false) String segredoRecebido) {
+
+        if (webhookSecretConfigurado == null || webhookSecretConfigurado.isBlank()) {
+            logger.warn("Recebido webhook da Delfinance, mas delfinance.webhook-secret não está configurado no backend. Ignorando por segurança.");
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
+
+        if (segredoRecebido == null || !segredoRecebido.equals(webhookSecretConfigurado)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Segredo de webhook inválido.");
+        }
+
+        String eventType = corpo.path("eventType").asText("");
+        String correlationId = corpo.path("correlationId").asText(null);
+
+        // Só nos importa a confirmação de recebimento (cobranças de fiado).
+        // Outros eventTypes (ex.: PIX_REFUNDED) são apenas confirmados com
+        // 200 OK e ignorados — a Delfinance reenvia em retry se não receber 2xx.
+        if ("PIX_RECEIVED".equals(eventType) && correlationId != null && correlationId.startsWith("FIADO-")) {
+            fiadoService.marcarComoPagoPorCorrelationId(correlationId);
+        } else {
+            logger.info("Webhook Delfinance recebido e ignorado (eventType={}, correlationId={}).", eventType, correlationId);
+        }
+
+        return ResponseEntity.ok().build();
+    }
+}

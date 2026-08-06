@@ -82,7 +82,7 @@ public class EstoqueMortoService {
 
             LocalDateTime ultimaVenda = movimentacaoRepository.buscarDataUltimaVenda(p.getId());
             if (ultimaVenda == null) {
-                // nunca vendeu -> conta os dias a partir da DATA DE CADASTRO
+                //  nunca vendeu -> conta os dias a partir da DATA DE CADASTRO
                 // em vez de deixar o contador nulo/parado em "Nunca vendeu".
                 LocalDateTime referencia = p.getDataCriacao() != null ? p.getDataCriacao() : agora;
                 long dias = ChronoUnit.DAYS.between(referencia, agora);

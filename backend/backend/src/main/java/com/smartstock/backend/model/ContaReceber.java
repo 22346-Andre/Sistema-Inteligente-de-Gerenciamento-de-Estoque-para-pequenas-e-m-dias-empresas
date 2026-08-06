@@ -40,4 +40,11 @@ public class ContaReceber {
 
     @Enumerated(EnumType.STRING)
     private StatusConta status = StatusConta.PENDENTE;
+
+    //  Preenchido quando uma cobrança Pix dinâmica é gerada via Delfinance.
+    // É esse identificador que volta no webhook PIX_RECEIVED e permite
+    // marcar a conta como paga automaticamente, sem o lojista precisar
+    // confirmar manualmente.
+    @Column(name = "pix_correlation_id", length = 60)
+    private String pixCorrelationId;
 }
