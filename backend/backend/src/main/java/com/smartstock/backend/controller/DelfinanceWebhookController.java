@@ -17,11 +17,7 @@ import org.springframework.web.bind.annotation.*;
  * Configure essa URL no painel da Delfinance (ou via POST /baas/api/v1/webhooks
  * com eventType "PIX_RECEIVED") apontando pra:
  *   https://<seu-backend>/api/webhooks/delfinance/pix
- * usando authorizationScheme "HEADER" com o mesmo valor de
- * delfinance.webhook-secret configurado aqui.
  *
- * Autenticação: header X-Delfinance-Webhook-Secret — segredo compartilhado
- * (não por empresa, porque a conta Delfinance é uma só, do SmartStock).
  */
 @RestController
 @RequestMapping("/api/webhooks/delfinance")
@@ -41,15 +37,23 @@ public class DelfinanceWebhookController {
     @PostMapping("/pix")
     public ResponseEntity<?> receberEventoPix(
             @RequestBody JsonNode corpo,
-            @RequestHeader(value = "X-Delfinance-Webhook-Secret", required = false) String segredoRecebido) {
+            @RequestHeader(value = "Authorization", required = false) String authorizationRecebido) {
 
         if (webhookSecretConfigurado == null || webhookSecretConfigurado.isBlank()) {
             logger.warn("Recebido webhook da Delfinance, mas delfinance.webhook-secret não está configurado no backend. Ignorando por segurança.");
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
         }
 
-        if (segredoRecebido == null || !segredoRecebido.equals(webhookSecretConfigurado)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Segredo de webhook inválido.");
+        // Aceita tanto "Authorization: <segredo>" (esquema HEADER) quanto
+        // "Authorization: Bearer <segredo>" (esquema BEARER) — tira o
+        // prefixo "Bearer " se ele vier, e compara o resto.
+        String valorRecebido = authorizationRecebido == null ? null : authorizationRecebido.trim();
+        if (valorRecebido != null && valorRecebido.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            valorRecebido = valorRecebido.substring(7).trim();
+        }
+
+        if (valorRecebido == null || !valorRecebido.equals(webhookSecretConfigurado)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Credencial de webhook inválida.");
         }
 
         String eventType = corpo.path("eventType").asText("");

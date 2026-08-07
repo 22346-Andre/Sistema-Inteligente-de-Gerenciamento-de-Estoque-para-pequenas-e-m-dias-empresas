@@ -90,6 +90,7 @@ public class FiadoService {
     }
 
     
+    
     public String gerarCobrancaPix(Long id, Long empresaId) {
         ContaReceber conta = buscarContaDaEmpresa(id, empresaId);
         Empresa empresa = conta.getEmpresa();
@@ -118,7 +119,7 @@ public class FiadoService {
         );
     }
 
-    // 🆕 Chamado pelo DelfinanceWebhookController quando chega um evento
+    //  Chamado pelo DelfinanceWebhookController quando chega um evento
     // PIX_RECEIVED. Marca a conta como paga automaticamente, sem exigir
     // login/JWT (o webhook é uma rota pública autenticada por segredo).
     public void marcarComoPagoPorCorrelationId(String correlationId) {
