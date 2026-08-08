@@ -19,7 +19,7 @@ import java.time.Duration;
  * Cliente da API Pix da Delfinance (https://docs.delbank.com.br).
  *
  * Endpoint e contrato confirmados na documentação pública da Delfinance em
- * agosto/2026 — POST {baseUrl}/baas/api/v2/pix/qrcode/dynamic/, autenticado
+ * agosto/2026 — POST {baseUrl}/baas/api/v2/pix/qrcode/dynamic, autenticado
  * via headers x-delbank-api-key + x-delfinance-account-id.
  *
  * Desligado por padrão (delfinance.enabled=false): enquanto não houver chave
@@ -87,10 +87,11 @@ public class DelfinanceClient {
 
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + "/baas/api/v2/pix/qrcode/dynamic/"))
+                    .uri(URI.create(baseUrl + "/baas/api/v2/pix/qrcode/dynamic"))
                     .header("x-delbank-api-key", apiKey)
                     .header("x-delfinance-account-id", accountId)
                     .header("Content-Type", "application/json")
+                    .header("IdempotencyKey", java.util.UUID.randomUUID().toString())
                     .timeout(Duration.ofSeconds(15))
                     .POST(HttpRequest.BodyPublishers.ofString(corpo.toString()))
                     .build();
@@ -116,6 +117,43 @@ public class DelfinanceClient {
             Thread.currentThread().interrupt();
             logger.error("Falha de rede ao chamar a API da Delfinance.", e);
             throw new IllegalStateException("Não foi possível conectar à Delfinance no momento.", e);
+        }
+    }
+
+    /**
+     *  Só existe no ambiente de SANDBOX da Delfinance (não funciona em
+     * produção). Dispara o pagamento fictício de uma cobrança já criada,
+     * fazendo o sistema se comportar exatamente como se um pagador real
+     * tivesse escaneado e pago — incluindo o disparo do webhook PIX_RECEIVED
+     * de verdade pra sua URL configurada. Serve pra testar o fluxo completo
+     * (Fiado → Pix → webhook → baixa automática) sem precisar de um app de
+     * banco de verdade.
+     *
+     * @param correlationId o mesmo identificador usado na criação da cobrança
+     *                      (ex.: "FIADO-42").
+     */
+    public void simularPagamento(String correlationId) {
+        if (!isEnabled()) {
+            throw new IllegalStateException("Delfinance não está configurada.");
+        }
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/baas/api/v2/pix/qrcode/" + correlationId + "/simulate-conclude"))
+                    .header("x-delbank-api-key", apiKey)
+                    .header("x-delfinance-account-id", accountId)
+                    .timeout(Duration.ofSeconds(15))
+                    .POST(HttpRequest.BodyPublishers.noBody())
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 202) {
+                logger.warn("Delfinance retornou status {} ao simular pagamento de {}: {}", response.statusCode(), correlationId, response.body());
+                throw new IllegalStateException("Delfinance recusou a simulação de pagamento (status " + response.statusCode() + "): " + response.body());
+            }
+        } catch (java.io.IOException | InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Não foi possível conectar à Delfinance para simular o pagamento.", e);
         }
     }
 }

@@ -64,6 +64,15 @@ public class FiadoController {
         return ResponseEntity.ok(Map.of("copiaECola", copiaECola));
     }
 
+    // 🆕 Só funciona em sandbox — dispara o pagamento fictício da cobrança
+    // Delfinance gerada pra esse fiado (ver DelfinanceClient.simularPagamento),
+    // pra testar o fluxo completo sem precisar de um app de banco de verdade.
+    @PostMapping("/{id}/pix-delfinance/simular")
+    public ResponseEntity<Void> simularPagamentoDelfinance(@PathVariable Long id) {
+        fiadoService.simularPagamentoDelfinance(id, getEmpresaIdLogada());
+        return ResponseEntity.accepted().build();
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<ContaReceber> atualizar(@PathVariable Long id, @RequestBody ContaReceberDTO dto) {
         Long empresaId = getEmpresaIdLogada();

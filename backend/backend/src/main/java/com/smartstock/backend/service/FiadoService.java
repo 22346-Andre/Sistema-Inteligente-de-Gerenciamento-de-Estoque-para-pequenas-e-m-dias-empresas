@@ -89,8 +89,7 @@ public class FiadoService {
         return "https://wa.me/" + telefoneLimpo + "?text=" + textoCodificado;
     }
 
-    
-    
+   
     public String gerarCobrancaPix(Long id, Long empresaId) {
         ContaReceber conta = buscarContaDaEmpresa(id, empresaId);
         Empresa empresa = conta.getEmpresa();
@@ -132,6 +131,17 @@ public class FiadoService {
             contaRepository.save(conta);
             logger.info("Webhook Delfinance: fiado #{} marcado como pago automaticamente (correlationId={}).", conta.getId(), correlationId);
         }, () -> logger.warn("Webhook Delfinance: nenhum fiado encontrado para correlationId={}", correlationId));
+    }
+
+    //  Dispara a simulação de pagamento no sandbox da Delfinance (ver
+    // DelfinanceClient.simularPagamento) pra esse fiado — só funciona se ele
+    // já tiver uma cobrança Delfinance gerada (pixCorrelationId preenchido).
+    public void simularPagamentoDelfinance(Long id, Long empresaId) {
+        ContaReceber conta = buscarContaDaEmpresa(id, empresaId);
+        if (conta.getPixCorrelationId() == null || conta.getPixCorrelationId().isBlank()) {
+            throw new IllegalStateException("Esse fiado ainda não tem uma cobrança Pix da Delfinance gerada. Gere o Pix primeiro (GET /fiados/" + id + "/pix).");
+        }
+        delfinanceClient.simularPagamento(conta.getPixCorrelationId());
     }
 
     public List<ContaReceber> buscarClientesParaCobrar(Long empresaId) {
