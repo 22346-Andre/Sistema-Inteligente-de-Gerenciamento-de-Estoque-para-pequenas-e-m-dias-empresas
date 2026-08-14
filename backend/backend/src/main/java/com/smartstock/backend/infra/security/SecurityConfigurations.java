@@ -61,6 +61,13 @@ public class SecurityConfigurations {
                         .requestMatchers(HttpMethod.POST, "/auth/confirmar-cadastro").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/reenviar-codigo-cadastro").permitAll()
                         .requestMatchers(HttpMethod.GET, "/wakeup").permitAll()
+                        // Health check público (é o que o Render usa pra saber se a
+                        // instância está viva) — não expõe segredo nenhum, só status.
+                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+                        // Demais endpoints do Actuator (ex.: /actuator/metrics) exigem
+                        // usuário logado — não é ideal pra um dashboard de ops dedicado,
+                        // mas evita deixar métricas do sistema totalmente públicas sem
+                        // criar já uma role de admin separada.
                         .anyRequest().authenticated())
 
                 .csrf(csrf -> csrf.disable())

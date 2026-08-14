@@ -5,6 +5,7 @@ import com.smartstock.backend.model.Produto;
 import com.smartstock.backend.repository.MovimentacaoRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -27,6 +28,10 @@ public class CurvaAbcService {
     @Autowired
     private MovimentacaoRepository movimentacaoRepository;
 
+    // Cálculo em memória (ordenação + acumulado percentual sobre todo o
+    // catálogo) — é o relatório mais pesado de CPU do sistema hoje, então
+    // é o que mais se beneficia de cache.
+    @Cacheable(cacheNames = "curvaAbc", key = "#empresaId + '_' + #criterio + '_' + #dias")
     public List<CurvaABCDTO> calcular(Long empresaId, Criterio criterio, int dias) {
         LocalDateTime dataInicio = LocalDateTime.now().minusDays(dias);
 

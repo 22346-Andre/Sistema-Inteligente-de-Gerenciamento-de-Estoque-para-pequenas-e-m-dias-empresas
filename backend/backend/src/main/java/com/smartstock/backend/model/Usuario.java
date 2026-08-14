@@ -42,7 +42,7 @@ public class Usuario implements UserDetails {
     @Column(name = "dono", nullable = false)
     private boolean dono = false;
 
-    // 🟢 NOVO: campos do fluxo "Esqueci minha senha". Token opaco (UUID) com
+    //  campos do fluxo "Esqueci minha senha". Token opaco (UUID) com
     // validade curta — @JsonIgnore pra nunca vazar no JSON de resposta de
     // nenhum endpoint que devolva Usuario (ex.: /usuarios).
     @JsonIgnore

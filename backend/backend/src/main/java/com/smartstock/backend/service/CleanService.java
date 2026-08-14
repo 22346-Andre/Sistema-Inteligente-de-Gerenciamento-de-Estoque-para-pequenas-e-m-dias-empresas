@@ -3,6 +3,7 @@ package com.smartstock.backend.service;
 import com.smartstock.backend.model.Empresa;
 import com.smartstock.backend.repository.EmpresaRepository;
 import jakarta.transaction.Transactional;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ public class CleanService {
 
     // Roda todo dia às 03:00 da manhã (Expressão Cron)
     @Scheduled(cron = "0 0 3 * * *")
+    @SchedulerLock(name = "apagarEmpresasInativas", lockAtMostFor = "PT30M", lockAtLeastFor = "PT1M")
     @Transactional
     public void apagarEmpresasInativas() {
         System.out.println("🧹 [FAXINA] Iniciando verificação de empresas inativas...");

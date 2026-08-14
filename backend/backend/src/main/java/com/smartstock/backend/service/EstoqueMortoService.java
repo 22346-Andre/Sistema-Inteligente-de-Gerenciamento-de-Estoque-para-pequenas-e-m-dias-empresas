@@ -7,6 +7,7 @@ import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.MovimentacaoRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
@@ -55,6 +56,7 @@ public class EstoqueMortoService {
                 .orElse(DIAS_PADRAO_ESTOQUE_MORTO);
     }
 
+    @Cacheable(cacheNames = "estoqueEncalhado", keyGenerator = "empresaCacheKeyGenerator")
     public List<EstoqueMortoDTO> listarEstoqueMorto() {
         return listarEstoqueMortoPorEmpresa(getEmpresaIdLogada());
     }

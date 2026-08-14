@@ -5,6 +5,7 @@ import com.smartstock.backend.repository.FornecedorRepository;
 import com.smartstock.backend.repository.MovimentacaoRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,10 @@ public class DashboardService {
         return jwt.getClaim("empresaId");
     }
 
+    // Cache de 60s (ver CacheConfig) — tela de dashboard é lida a cada
+    // refresh/navegação e não precisa refletir a venda que acabou de
+    // acontecer no segundo exato.
+    @Cacheable(cacheNames = "dashboardResumo", keyGenerator = "empresaCacheKeyGenerator")
     public DashboardDTO obterResumoDashboard() {
         Long empresaId = getEmpresaIdLogada();
         DashboardDTO dashboard = new DashboardDTO();
@@ -60,6 +65,7 @@ public class DashboardService {
     }
 
 
+    @Cacheable(cacheNames = "dashboardGrafico", keyGenerator = "empresaCacheKeyGenerator")
     public List<GraficoDTO> obterDadosGrafico() {
         Long empresaId = getEmpresaIdLogada();
 

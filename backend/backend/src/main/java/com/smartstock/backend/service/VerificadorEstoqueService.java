@@ -6,6 +6,7 @@ import com.smartstock.backend.model.Produto;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.LoteRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +31,7 @@ public class VerificadorEstoqueService {
 
     // Roda todo dia às 08:00 da manhã para entregar o "Resumo Diário"
     @Scheduled(cron = "0 0 8 * * *", zone = "America/Sao_Paulo")
+    @SchedulerLock(name = "relatorioDiarioInteligente", lockAtMostFor = "PT30M", lockAtLeastFor = "PT1M")
     public void relatorioDiarioInteligente() {
         System.out.println("🤖 [IA SmartStock] Iniciando varredura de inteligência de estoque...");
 

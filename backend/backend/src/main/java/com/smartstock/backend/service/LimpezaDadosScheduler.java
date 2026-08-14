@@ -1,6 +1,7 @@
 package com.smartstock.backend.service;
 
 import com.smartstock.backend.repository.MovimentacaoRepository;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ public class LimpezaDadosScheduler {
      * "0 0 3 * * ?" = Às 03:00:00 de todos os dias.
      */
     @Scheduled(cron = "0 0 3 * * ?")
+    @SchedulerLock(name = "limparHistoricoAntigo", lockAtMostFor = "PT30M", lockAtLeastFor = "PT1M")
     @Transactional
     public void limparHistoricoAntigo() {
         System.out.println("[CRON] A iniciar a limpeza do histórico de movimentações antigas...");

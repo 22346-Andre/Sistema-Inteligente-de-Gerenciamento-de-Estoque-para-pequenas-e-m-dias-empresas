@@ -27,7 +27,7 @@
         <url/>
     </scm>
     <properties>
-        <java.version>25</java.version>
+        <java.version>21</java.version>
         <lombok.version>1.18.46</lombok.version>
         <maven.compiler.proc>full</maven.compiler.proc>
     </properties>
@@ -93,6 +93,24 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Testcontainers sobe um MySQL real (Docker) pros testes de
+             integração. Optei por isso em vez de H2: o schema depende de
+             migrations Flyway com sintaxe específica do MySQL, então testar
+             contra H2 daria falso positivo/negativo em vários pontos
+             (locking pessimista, tipos, índices). Exige Docker disponível
+             na máquina/CI que rodar `mvn test`. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>1.20.4</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>mysql</artifactId>
+            <version>1.20.4</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
@@ -101,6 +119,33 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <!-- Lock distribuído pros @Scheduled jobs (relatório diário, limpezas).
+             Sem isso, no dia em que subir uma 2ª instância, cada instância roda
+             o job por conta própria: o caso mais grave é o cliente receber o
+             e-mail de resumo diário duplicado. O lock usa uma tabela no próprio
+             MySQL, sem precisar subir Redis só pra isso. -->
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
+            <version>5.16.0</version>
+        </dependency>
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-provider-jdbc-template</artifactId>
+            <version>5.16.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
         </dependency>
         <dependency>
             <groupId>com.github.librepdf</groupId>
@@ -166,6 +211,19 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
+                </configuration>
+            </plugin>
+            <!-- Java 21+ trava por padrão ferramentas que se auto-anexam via
+                 agente pra instrumentar bytecode em tempo de execução: é
+                 exatamente isso que o Mockito faz pra criar mocks. Sem essa
+                 flag, TODO teste que usa @MockBean/Mockito falha ao subir o
+                 contexto do Spring, mesmo sem nenhum mock explícito no teste
+                 (o Spring Boot Test já carrega o Mockito por padrão). -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                   <argLine>-XX:+EnableDynamicAgentLoading -Djdk.attach.allowAttachSelf=true -Xshare:off</argLine>
                 </configuration>
             </plugin>
         </plugins>

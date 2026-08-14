@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 /**
- * 🟢 NOVO: diagnóstico de e-mail. Todo envio de e-mail do sistema é @Async +
+ * NOVO: diagnóstico de e-mail. Todo envio de e-mail do sistema é @Async +
  * try/catch silencioso (loga e some) — proposital pra não travar a resposta
  * HTTP do usuário final esperando o SMTP responder, mas isso também significa
  * que se o envio falhar (senha errada, porta SMTP bloqueada pelo provedor de

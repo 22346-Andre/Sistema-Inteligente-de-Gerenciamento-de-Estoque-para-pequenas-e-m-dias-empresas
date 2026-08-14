@@ -17,6 +17,7 @@ import com.smartstock.backend.service.PasswordResetService;
 import com.smartstock.backend.service.RegistroService;
 import com.smartstock.backend.service.TokenService;
 import com.smartstock.backend.service.VerificacaoCadastroService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -104,19 +105,20 @@ public class AuthController {
 
     // --- ROTA DE LOGIN NORMAL ---
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest loginRequest, HttpServletRequest request) {
 
-        
-        loginAttemptService.verificarBloqueio(loginRequest.email());
+        String ip = extrairIpCliente(request);
+
+        loginAttemptService.verificarBloqueio(loginRequest.email(), ip);
 
         var userOptional = userRepository.findByEmail(loginRequest.email());
 
         if (userOptional.isEmpty() || !userOptional.get().isLoginCorrect(loginRequest, passwordEncoder)) {
-            loginAttemptService.registrarFalha(loginRequest.email());
+            loginAttemptService.registrarFalha(loginRequest.email(), ip);
             throw new BadCredentialsException("Usuário ou senha inválidos!");
         }
 
-        loginAttemptService.registrarSucesso(loginRequest.email());
+        loginAttemptService.registrarSucesso(loginRequest.email(), ip);
 
         var user = userOptional.get();
 
@@ -158,5 +160,27 @@ public class AuthController {
     public ResponseEntity<String> redefinirSenha(@RequestBody @Valid RedefinirSenhaDTO dto) {
         passwordResetService.redefinirSenha(dto.token(), dto.novaSenha());
         return ResponseEntity.ok("Senha redefinida com sucesso! Você já pode entrar com a nova senha.");
+    }
+
+    /**
+     * Atrás de um load balancer/proxy (Render, Railway etc.), o IP que chega
+     * na conexão TCP é o do proxy, não o do cliente real — por isso é
+     * preciso ler o cabeçalho X-Forwarded-For primeiro. Esse cabeçalho pode
+     * ter uma lista "cliente, proxy1, proxy2"; o primeiro valor é o mais
+     * próximo do cliente original.
+     *
+     * ATENÇÃO se algum dia isso for exposto sem estar atrás do proxy da
+     * plataforma (Render/Railway): X-Forwarded-For é um header que QUALQUER
+     * requisição pode mandar forjado. Hoje isso é seguro porque o único
+     * caminho de entrada é o proxy da plataforma de hospedagem, que
+     * sobrescreve esse header. Se o app um dia for exposto direto (sem
+     * proxy na frente), esse método precisa ser revisto.
+     */
+    private String extrairIpCliente(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }
