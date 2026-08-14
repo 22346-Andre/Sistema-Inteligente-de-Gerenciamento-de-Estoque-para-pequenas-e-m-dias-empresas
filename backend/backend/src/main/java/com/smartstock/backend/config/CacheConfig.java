@@ -34,6 +34,7 @@ public class CacheConfig {
                 "dashboardResumo",
                 "dashboardGrafico",
                 "curvaAbc",
+                "giroEstoque",
                 "estoqueEncalhado",
                 "estatisticas"
         );

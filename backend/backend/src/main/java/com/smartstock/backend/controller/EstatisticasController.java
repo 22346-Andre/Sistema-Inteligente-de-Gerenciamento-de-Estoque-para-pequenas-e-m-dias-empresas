@@ -2,8 +2,10 @@ package com.smartstock.backend.controller;
 
 import com.smartstock.backend.dto.CurvaABCDTO;
 import com.smartstock.backend.dto.EstatisticasDTO;
+import com.smartstock.backend.dto.GiroEstoqueDTO;
 import com.smartstock.backend.service.CurvaAbcService;
 import com.smartstock.backend.service.EstatisticasService;
+import com.smartstock.backend.service.GiroEstoqueService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -25,6 +27,9 @@ public class EstatisticasController {
     @Autowired
     private CurvaAbcService curvaAbcService;
 
+    @Autowired
+    private GiroEstoqueService giroEstoqueService;
+
     //  Apenas gestores podem aceder a dados financeiros profundos
     @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPER_ADMIN')")
     @GetMapping
@@ -43,7 +48,6 @@ public class EstatisticasController {
 
         CurvaAbcService.Criterio criterioEnum = switch (criterio.toLowerCase()) {
             case "lucratividade" -> CurvaAbcService.Criterio.LUCRATIVIDADE;
-            case "giro" -> CurvaAbcService.Criterio.GIRO;
             default -> CurvaAbcService.Criterio.FATURAMENTO;
         };
 
@@ -52,5 +56,20 @@ public class EstatisticasController {
         int diasSeguro = Math.max(1, Math.min(dias, 730));
 
         return curvaAbcService.calcular(empresaId, criterioEnum, diasSeguro);
+    }
+
+    // Giro de Estoque é um relatório à parte da Curva ABC — mede VELOCIDADE
+    // (saídas / estoque atual), não VALOR, então não faz sentido como um
+    // "critério" da curva ABC. Ver GiroEstoqueService para a justificativa completa.
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPER_ADMIN')")
+    @GetMapping("/giro-estoque")
+    public List<GiroEstoqueDTO> obterGiroEstoque(
+            @RequestParam(defaultValue = "90") int dias) {
+        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Long empresaId = jwt.getClaim("empresaId");
+
+        int diasSeguro = Math.max(1, Math.min(dias, 730));
+
+        return giroEstoqueService.calcularPorProduto(empresaId, diasSeguro);
     }
 }

@@ -20,7 +20,13 @@ import java.util.Map;
 @Service
 public class CurvaAbcService {
 
-    public enum Criterio { FATURAMENTO, LUCRATIVIDADE, GIRO }
+    // Curva ABC é, por definição, uma classificação por VALOR (Pareto sobre
+    // valor de consumo/demanda) — Faturamento e Lucratividade multiplicam
+    // quantidade por preço, então cabem aqui. Giro de estoque é uma razão
+    // (saídas / estoque atual), não um valor monetário, e por isso foi
+    // separado para GiroEstoqueService, evitando misturar dois indicadores
+    // de gestão conceitualmente diferentes num só relatório.
+    public enum Criterio { FATURAMENTO, LUCRATIVIDADE }
 
     @Autowired
     private ProdutoRepository produtoRepository;
@@ -38,7 +44,6 @@ public class CurvaAbcService {
         List<Object[]> linhas = switch (criterio) {
             case FATURAMENTO -> movimentacaoRepository.somarFaturamentoPorProdutoNoPeriodo(empresaId, dataInicio);
             case LUCRATIVIDADE -> movimentacaoRepository.somarLucroPorProdutoNoPeriodo(empresaId, dataInicio);
-            case GIRO -> movimentacaoRepository.somarVolumeVendidoPorProdutoNoPeriodo(empresaId, dataInicio);
         };
 
         Map<Long, BigDecimal> valorPorProduto = new HashMap<>();
@@ -70,13 +75,15 @@ public class CurvaAbcService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         List<CurvaABCDTO> resultado = new ArrayList<>();
+        int totalItens = produtosOrdenados.size();
 
         if (totalGeral.compareTo(BigDecimal.ZERO) == 0) {
             // Empresa sem nenhuma venda no período (loja nova, ou período curto
             // demais) — não dá pra calcular percentual acumulado com divisor
             // zero. Devolve tudo como classe C ao invés de dividir por zero.
-            for (Produto p : produtosOrdenados) {
-                resultado.add(montarItem(p, BigDecimal.ZERO, 0.0, "C"));
+            for (int idx = 0; idx < totalItens; idx++) {
+                double percentualItens = (idx + 1) * 100.0 / totalItens;
+                resultado.add(montarItem(produtosOrdenados.get(idx), BigDecimal.ZERO, 0.0, percentualItens, "C"));
             }
             return resultado;
         }
@@ -98,11 +105,15 @@ public class CurvaAbcService {
             acumulado = acumulado.add(valorDoBloco.multiply(BigDecimal.valueOf(quantidadeNoBloco)));
 
             double percentual = acumulado.divide(totalGeral, 4, RoundingMode.HALF_UP).doubleValue() * 100;
+            // Eixo X do gráfico de Pareto (Tabela Mestra do artigo): % da
+            // QUANTIDADE de itens acumulada até o fim deste bloco — não
+            // confundir com percentual de valor (eixo Y) calculado acima.
+            double percentualItens = fimBloco * 100.0 / totalItens;
             String classe = percentual <= 80.0 ? "A" : percentual <= 95.0 ? "B" : "C";
 
             for (int k = i; k < fimBloco; k++) {
                 Produto p = produtosOrdenados.get(k);
-                resultado.add(montarItem(p, valorDoBloco, percentual, classe));
+                resultado.add(montarItem(p, valorDoBloco, percentual, percentualItens, classe));
             }
 
             i = fimBloco;
@@ -111,13 +122,14 @@ public class CurvaAbcService {
         return resultado;
     }
 
-    private CurvaABCDTO montarItem(Produto p, BigDecimal valor, double percentualAcumulado, String classe) {
+    private CurvaABCDTO montarItem(Produto p, BigDecimal valor, double percentualAcumulado, double percentualItensAcumulado, String classe) {
         CurvaABCDTO item = new CurvaABCDTO();
         item.setProdutoId(p.getId());
         item.setNomeProduto(p.getNome());
         item.setQuantidade(p.getQuantidade() != null ? p.getQuantidade() : 0);
         item.setValorTotal(valor);
         item.setPercentualAcumulado(Math.round(percentualAcumulado * 100.0) / 100.0);
+        item.setPercentualItensAcumulado(Math.round(percentualItensAcumulado * 100.0) / 100.0);
         item.setClasse(classe);
         return item;
     }

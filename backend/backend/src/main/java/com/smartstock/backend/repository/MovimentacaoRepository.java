@@ -70,9 +70,10 @@ Integer sumSaidasPorProdutoUltimosDias(@Param("produtoId") Long produtoId,
            "GROUP BY m.produto.id")
     List<Object[]> somarLucroPorProdutoNoPeriodo(@Param("empresaId") Long empresaId, @Param("dataInicio") LocalDateTime dataInicio);
 
-    //  contagem de unidades vendidas por produto no período — usado na
-    // visão "ABC por Volume de Giro" (útil pra organizar o layout do estoque:
-    // itens de giro alto ficam mais perto do caixa/expedição).
+    //  contagem de unidades vendidas por produto no período — usado por
+    // GiroEstoqueService como numerador da fórmula de giro (saídas / estoque
+    // atual). Não é mais usado pela Curva ABC: ABC é classificação por VALOR,
+    // giro é uma razão de velocidade, são indicadores diferentes.
     @Query("SELECT m.produto.id, SUM(m.quantidade) " +
            "FROM Movimentacao m " +
            "WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataInicio " +
