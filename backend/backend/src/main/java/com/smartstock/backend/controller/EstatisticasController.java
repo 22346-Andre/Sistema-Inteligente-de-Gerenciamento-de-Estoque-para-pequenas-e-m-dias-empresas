@@ -42,12 +42,17 @@ public class EstatisticasController {
     @GetMapping("/curva-abc")
     public List<CurvaABCDTO> obterCurvaAbc(
             @RequestParam(defaultValue = "faturamento") String criterio,
+            // "dias" é ignorado quando criterio=capital-imobilizado (esse
+            // critério é sempre uma foto do estoque atual, não um período de
+            // vendas) — mantido como parâmetro só pra não quebrar contrato
+            // com faturamento/lucratividade.
             @RequestParam(defaultValue = "90") int dias) {
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         Long empresaId = jwt.getClaim("empresaId");
 
         CurvaAbcService.Criterio criterioEnum = switch (criterio.toLowerCase()) {
             case "lucratividade" -> CurvaAbcService.Criterio.LUCRATIVIDADE;
+            case "capital-imobilizado" -> CurvaAbcService.Criterio.CAPITAL_IMOBILIZADO;
             default -> CurvaAbcService.Criterio.FATURAMENTO;
         };
 

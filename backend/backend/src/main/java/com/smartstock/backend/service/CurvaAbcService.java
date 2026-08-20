@@ -26,7 +26,14 @@ public class CurvaAbcService {
     // (saídas / estoque atual), não um valor monetário, e por isso foi
     // separado para GiroEstoqueService, evitando misturar dois indicadores
     // de gestão conceitualmente diferentes num só relatório.
-    public enum Criterio { FATURAMENTO, LUCRATIVIDADE }
+    //
+    // CAPITAL_IMOBILIZADO é a "Curva ABC de Estoque": também é valor (não é
+    // o erro de usar volume puro que o GIRO antigo cometia), mas ao invés de
+    // olhar pra vendas de um período, olha pro estoque parado HOJE
+    // (quantidade em mãos × custo unitário). Responde "onde está meu capital
+    // parado", não "o que mais vende" — por isso o período (dias) não se
+    // aplica a esse critério, é sempre uma foto do estoque atual.
+    public enum Criterio { FATURAMENTO, LUCRATIVIDADE, CAPITAL_IMOBILIZADO }
 
     @Autowired
     private ProdutoRepository produtoRepository;
@@ -39,27 +46,39 @@ public class CurvaAbcService {
     // é o que mais se beneficia de cache.
     @Cacheable(cacheNames = "curvaAbc", key = "#empresaId + '_' + #criterio + '_' + #dias")
     public List<CurvaABCDTO> calcular(Long empresaId, Criterio criterio, int dias) {
-        LocalDateTime dataInicio = LocalDateTime.now().minusDays(dias);
-
-        List<Object[]> linhas = switch (criterio) {
-            case FATURAMENTO -> movimentacaoRepository.somarFaturamentoPorProdutoNoPeriodo(empresaId, dataInicio);
-            case LUCRATIVIDADE -> movimentacaoRepository.somarLucroPorProdutoNoPeriodo(empresaId, dataInicio);
-        };
+        List<Produto> todosProdutos = produtoRepository.findByEmpresaId(empresaId);
 
         Map<Long, BigDecimal> valorPorProduto = new HashMap<>();
-        for (Object[] linha : linhas) {
-            Long produtoId = (Long) linha[0];
-            Number valorBruto = (Number) linha[1];
-            BigDecimal valor = valorBruto != null
-                    ? new BigDecimal(valorBruto.toString())
-                    : BigDecimal.ZERO;
-            // Lucratividade pode dar negativo se o produto foi vendido abaixo do
-            // custo (promoção/erro de precificação) — trava em zero pra não
-            // bagunçar o acumulado percentual da curva com valores negativos.
-            valorPorProduto.put(produtoId, valor.max(BigDecimal.ZERO));
-        }
 
-        List<Produto> todosProdutos = produtoRepository.findByEmpresaId(empresaId);
+        if (criterio == Criterio.CAPITAL_IMOBILIZADO) {
+            // Não usa período nem movimentação: é o valor do estoque parado
+            // agora — quantidade em mãos × custo unitário de cada produto.
+            for (Produto p : todosProdutos) {
+                BigDecimal quantidade = BigDecimal.valueOf(p.getQuantidade() != null ? p.getQuantidade() : 0);
+                BigDecimal custoUnitario = p.getPrecoCusto() != null ? p.getPrecoCusto() : BigDecimal.ZERO;
+                valorPorProduto.put(p.getId(), quantidade.multiply(custoUnitario).max(BigDecimal.ZERO));
+            }
+        } else {
+            LocalDateTime dataInicio = LocalDateTime.now().minusDays(dias);
+
+            List<Object[]> linhas = switch (criterio) {
+                case FATURAMENTO -> movimentacaoRepository.somarFaturamentoPorProdutoNoPeriodo(empresaId, dataInicio);
+                case LUCRATIVIDADE -> movimentacaoRepository.somarLucroPorProdutoNoPeriodo(empresaId, dataInicio);
+                case CAPITAL_IMOBILIZADO -> throw new IllegalStateException("tratado acima"); // inatingível
+            };
+
+            for (Object[] linha : linhas) {
+                Long produtoId = (Long) linha[0];
+                Number valorBruto = (Number) linha[1];
+                BigDecimal valor = valorBruto != null
+                        ? new BigDecimal(valorBruto.toString())
+                        : BigDecimal.ZERO;
+                // Lucratividade pode dar negativo se o produto foi vendido abaixo do
+                // custo (promoção/erro de precificação) — trava em zero pra não
+                // bagunçar o acumulado percentual da curva com valores negativos.
+                valorPorProduto.put(produtoId, valor.max(BigDecimal.ZERO));
+            }
+        }
 
         // Só entra na curva o produto que existe hoje no catálogo. Produtos sem
         // registro na query de vendas (nunca venderam no período) recebem 0.
@@ -78,9 +97,10 @@ public class CurvaAbcService {
         int totalItens = produtosOrdenados.size();
 
         if (totalGeral.compareTo(BigDecimal.ZERO) == 0) {
-            // Empresa sem nenhuma venda no período (loja nova, ou período curto
-            // demais) — não dá pra calcular percentual acumulado com divisor
-            // zero. Devolve tudo como classe C ao invés de dividir por zero.
+            // CAPITAL_IMOBILIZADO com tudo zero = catálogo sem custo cadastrado
+            // ou sem estoque; FATURAMENTO/LUCRATIVIDADE com tudo zero = sem
+            // vendas no período. Nos dois casos não dá pra dividir por zero —
+            // devolve tudo como classe C.
             for (int idx = 0; idx < totalItens; idx++) {
                 double percentualItens = (idx + 1) * 100.0 / totalItens;
                 resultado.add(montarItem(produtosOrdenados.get(idx), BigDecimal.ZERO, 0.0, percentualItens, "C"));
