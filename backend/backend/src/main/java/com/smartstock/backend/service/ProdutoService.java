@@ -193,6 +193,10 @@ public class ProdutoService {
             movInicial.setQuantidade(quantidadeInicial);
             movInicial.setEmpresa(empresa);
             movInicial.setMotivo("[CFOP " + cfopOperacao + "] Estoque inicial de cadastro");
+            // Setado explicitamente (não depende do valor padrão do campo na
+            // entidade) — garante que as consultas por dataMovimentacao
+            // (Curva ABC, Giro de Estoque) enxerguem essa movimentação.
+            movInicial.setDataMovimentacao(java.time.LocalDateTime.now());
 
             movimentacaoRepository.save(movInicial);
         }
@@ -267,6 +271,8 @@ public class ProdutoService {
                 ajuste.setTipo(TipoMovimentacao.SAIDA);
                 ajuste.setQuantidade(Math.abs(diferenca));
             }
+            // Setado explicitamente — mesmo motivo do comentário acima.
+            ajuste.setDataMovimentacao(java.time.LocalDateTime.now());
 
             movimentacaoRepository.save(ajuste);
         }
@@ -385,6 +391,11 @@ public class ProdutoService {
         mov.setQuantidade(quantidadeDesejada);
         mov.setEmpresa(produtoAtualizado.getEmpresa());
 
+        // Setado explicitamente — é essa data que as consultas de Curva ABC,
+        // Giro de Estoque e sugestão de compra usam pra filtrar "últimos N
+        // dias"; depender só do valor padrão do campo na entidade deixa essa
+        // consulta cega a qualquer atraso entre construir e persistir o objeto.
+        mov.setDataMovimentacao(java.time.LocalDateTime.now());
 
         mov.setChaveNotaFiscal(chaveNotaFiscal);
         mov.setFormaPagamento(formaPagamento); // 
@@ -435,6 +446,7 @@ public class ProdutoService {
         mov.setTipo(TipoMovimentacao.ENTRADA);
         mov.setQuantidade(novaQuantidade);
         mov.setEmpresa(produtoAtualizado.getEmpresa());
+        mov.setDataMovimentacao(java.time.LocalDateTime.now());
 
         String obs = "[CFOP " + cfopOperacao + "] Entrada de lote";
         if (dto.getNumeroLote() != null && !dto.getNumeroLote().isEmpty()) {

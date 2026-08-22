@@ -701,6 +701,11 @@ public class ImportacaoService {
         mov.setTipo(TipoMovimentacao.ENTRADA);
         mov.setQuantidade(quantidade);
         mov.setMotivo(motivo);
+        // Setado explicitamente em vez de depender do valor padrão do campo
+        // na entidade — mesmo padrão aplicado em todos os pontos que criam
+        // Movimentacao, pra eliminar qualquer dúvida sobre a data gravada
+        // nas consultas que filtram por dataMovimentacao (Curva ABC, Giro).
+        mov.setDataMovimentacao(java.time.LocalDateTime.now());
         movimentacaoRepository.save(mov);
     }
 }
