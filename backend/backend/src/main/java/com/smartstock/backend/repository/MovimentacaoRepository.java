@@ -56,15 +56,23 @@ Integer sumSaidasPorProdutoUltimosDias(@Param("produtoId") Long produtoId,
     LocalDateTime buscarDataUltimaVenda(@Param("produtoId") Long produtoId);
 
     
-    @Query("SELECT m.produto.id, SUM(m.quantidade * COALESCE(m.produto.precoVenda, m.produto.precoCusto, 0)) " +
+    // NULLIF(precoVenda, 0) trata tanto "nunca preenchido" (null) quanto
+    // "preenchido como zero pelo formulário" (0) como "sem preço de venda
+    // definido" — sem isso, produto criado com o campo Preço de Venda em
+    // branco (que o frontend manda como 0, não null) fazia COALESCE parar
+    // ali mesmo e nunca cair pro precoCusto, zerando o faturamento desse
+    // produto mesmo com vendas reais no período.
+    @Query("SELECT m.produto.id, SUM(m.quantidade * COALESCE(NULLIF(m.produto.precoVenda, 0), m.produto.precoCusto, 0)) " +
            "FROM Movimentacao m " +
            "WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataInicio " +
            "GROUP BY m.produto.id")
     List<Object[]> somarFaturamentoPorProdutoNoPeriodo(@Param("empresaId") Long empresaId, @Param("dataInicio") LocalDateTime dataInicio);
 
     //  mesma coisa, mas pela MARGEM (lucro = venda - custo) em vez do
-    // faturamento bruto — usado na visão "ABC por Lucratividade".
-    @Query("SELECT m.produto.id, SUM(m.quantidade * (COALESCE(m.produto.precoVenda, 0) - COALESCE(m.produto.precoCusto, 0))) " +
+    // faturamento bruto — usado na visão "ABC por Lucratividade". Mesmo
+    // NULLIF acima: precoVenda = 0 (campo deixado em branco no cadastro)
+    // não deve ser tratado como "vendido de graça".
+    @Query("SELECT m.produto.id, SUM(m.quantidade * (COALESCE(NULLIF(m.produto.precoVenda, 0), m.produto.precoCusto, 0) - COALESCE(m.produto.precoCusto, 0))) " +
            "FROM Movimentacao m " +
            "WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataInicio " +
            "GROUP BY m.produto.id")

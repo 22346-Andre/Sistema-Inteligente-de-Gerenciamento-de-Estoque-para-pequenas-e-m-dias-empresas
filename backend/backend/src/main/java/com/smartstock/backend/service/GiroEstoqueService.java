@@ -51,7 +51,20 @@ public class GiroEstoqueService {
             int estoqueAtual = p.getQuantidade() != null ? p.getQuantidade() : 0;
             int vendido = vendidoPorProduto.getOrDefault(p.getId(), 0);
 
-            double giro = estoqueAtual > 0 ? (double) vendido / estoqueAtual : 0.0;
+            // Bug real: dividir vendido/estoqueAtual e cair pra 0.0 quando
+            // estoqueAtual é zero classificava como "giro baixo/nenhuma
+            // movimentação" justamente o produto que girou TANTO que esgotou
+            // o estoque — o pior caso possível de leitura errada, porque é
+            // exatamente quando mais precisa de reposição urgente. Estoque
+            // zerado com vendas no período = giro real altíssimo, não zero.
+            double giro;
+            if (estoqueAtual > 0) {
+                giro = (double) vendido / estoqueAtual;
+            } else if (vendido > 0) {
+                giro = vendido;
+            } else {
+                giro = 0.0;
+            }
 
             GiroEstoqueDTO item = new GiroEstoqueDTO();
             item.setProdutoId(p.getId());

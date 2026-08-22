@@ -49,9 +49,17 @@ public class EstatisticasService {
         totalSaidas = (totalSaidas != null) ? totalSaidas : 0;
         estoqueAtual = (estoqueAtual != null) ? estoqueAtual : 0;
 
-        double giro = 0.0;
+        // Mesma correção do GiroEstoqueService: estoque total zerado (loja
+        // toda vendida, ou em fase de reposição) com saídas reais no período
+        // não é "giro zero" — é giro no limite. Sem isso, esse card do
+        // Dashboard mostrava "0x" justamente no cenário de maior movimento.
+        double giro;
         if (estoqueAtual > 0) {
             giro = (double) totalSaidas / estoqueAtual;
+        } else if (totalSaidas > 0) {
+            giro = totalSaidas;
+        } else {
+            giro = 0.0;
         }
         dto.setGiroEstoque(Math.round(giro * 100.0) / 100.0);
 
