@@ -24,8 +24,11 @@ public interface MovimentacaoRepository extends JpaRepository<Movimentacao, Long
     @org.springframework.data.jpa.repository.Query("SELECT m FROM Movimentacao m WHERE m.empresa.id = :empresaId AND m.dataMovimentacao >= :dataInicio")
     List<Movimentacao> findMovimentacoesUltimosDias(Long empresaId, java.time.LocalDateTime dataInicio);
 
-    // Soma o total de itens vendidos/saídas nos últimos dias (Para o Giro de Estoque)
-    @Query("SELECT COALESCE(SUM(m.quantidade), 0) FROM Movimentacao m WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataInicio")
+    // Soma o total de itens vendidos/saídas nos últimos dias (Para o Giro de Estoque).
+    // Mesma exclusão de uso interno do denominador (sumQuantidadeTotalEstoque) —
+    // sem isso os dois lados da fração deixavam de ser comparáveis.
+    @Query("SELECT COALESCE(SUM(m.quantidade), 0) FROM Movimentacao m WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataInicio " +
+           "AND (m.produto.finalidadeEstoque IS NULL OR m.produto.finalidadeEstoque <> 'USO_INTERNO')")
     Integer sumSaidasUltimosDias(@Param("empresaId") Long empresaId, @Param("dataInicio") java.time.LocalDateTime dataInicio);
 
     List<Movimentacao> findByProdutoIdOrderByDataMovimentacaoDesc(Long produtoId);
@@ -65,6 +68,7 @@ Integer sumSaidasPorProdutoUltimosDias(@Param("produtoId") Long produtoId,
     @Query("SELECT m.produto.id, SUM(m.quantidade * COALESCE(NULLIF(m.produto.precoVenda, 0), m.produto.precoCusto, 0)) " +
            "FROM Movimentacao m " +
            "WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataInicio " +
+           "AND (m.produto.finalidadeEstoque IS NULL OR m.produto.finalidadeEstoque <> 'USO_INTERNO') " +
            "GROUP BY m.produto.id")
     List<Object[]> somarFaturamentoPorProdutoNoPeriodo(@Param("empresaId") Long empresaId, @Param("dataInicio") LocalDateTime dataInicio);
 
@@ -75,6 +79,7 @@ Integer sumSaidasPorProdutoUltimosDias(@Param("produtoId") Long produtoId,
     @Query("SELECT m.produto.id, SUM(m.quantidade * (COALESCE(NULLIF(m.produto.precoVenda, 0), m.produto.precoCusto, 0) - COALESCE(m.produto.precoCusto, 0))) " +
            "FROM Movimentacao m " +
            "WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataInicio " +
+           "AND (m.produto.finalidadeEstoque IS NULL OR m.produto.finalidadeEstoque <> 'USO_INTERNO') " +
            "GROUP BY m.produto.id")
     List<Object[]> somarLucroPorProdutoNoPeriodo(@Param("empresaId") Long empresaId, @Param("dataInicio") LocalDateTime dataInicio);
 
@@ -85,6 +90,7 @@ Integer sumSaidasPorProdutoUltimosDias(@Param("produtoId") Long produtoId,
     @Query("SELECT m.produto.id, SUM(m.quantidade) " +
            "FROM Movimentacao m " +
            "WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' AND m.dataMovimentacao >= :dataInicio " +
+           "AND (m.produto.finalidadeEstoque IS NULL OR m.produto.finalidadeEstoque <> 'USO_INTERNO') " +
            "GROUP BY m.produto.id")
     List<Object[]> somarVolumeVendidoPorProdutoNoPeriodo(@Param("empresaId") Long empresaId, @Param("dataInicio") LocalDateTime dataInicio);
     //  datas de todas as ENTRADAS de produtos de um fornecedor, em

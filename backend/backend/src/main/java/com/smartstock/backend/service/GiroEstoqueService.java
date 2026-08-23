@@ -44,7 +44,9 @@ public class GiroEstoqueService {
             vendidoPorProduto.put(produtoId, quantidade != null ? quantidade.intValue() : 0);
         }
 
-        List<Produto> produtos = produtoRepository.findByEmpresaId(empresaId);
+        // Mesma exclusão de Uso Interno da Curva ABC — giro é sobre produto
+        // que vende, não sobre mobiliário/equipamento da própria empresa.
+        List<Produto> produtos = produtoRepository.findByEmpresaIdParaAnaliseDeGiro(empresaId);
 
         List<GiroEstoqueDTO> resultado = new ArrayList<>();
         for (Produto p : produtos) {

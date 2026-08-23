@@ -1,6 +1,7 @@
 package com.smartstock.backend.service;
 
 import com.smartstock.backend.dto.CurvaABCDTO;
+import com.smartstock.backend.dto.MatrizAbcDTO;
 import com.smartstock.backend.model.Produto;
 import com.smartstock.backend.repository.MovimentacaoRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
@@ -46,7 +47,10 @@ public class CurvaAbcService {
     // é o que mais se beneficia de cache.
     @Cacheable(cacheNames = "curvaAbc", key = "#empresaId + '_' + #criterio + '_' + #dias")
     public List<CurvaABCDTO> calcular(Long empresaId, Criterio criterio, int dias) {
-        List<Produto> todosProdutos = produtoRepository.findByEmpresaId(empresaId);
+        // findByEmpresaIdParaAnaliseDeGiro exclui itens de Uso Interno (ver
+        // ProdutoRepository) — capital de giro/faturamento são conceitos de
+        // produto de revenda, ativo fixo não compete por esse espaço.
+        List<Produto> todosProdutos = produtoRepository.findByEmpresaIdParaAnaliseDeGiro(empresaId);
 
         Map<Long, BigDecimal> valorPorProduto = new HashMap<>();
 
@@ -152,5 +156,48 @@ public class CurvaAbcService {
         item.setPercentualItensAcumulado(Math.round(percentualItensAcumulado * 100.0) / 100.0);
         item.setClasse(classe);
         return item;
+    }
+
+    // Matriz Faturamento × Lucratividade ("Produto Engana-Bobo"): roda as
+    // duas curvas e cruza a classe de cada produto nas duas. Cacheado à
+    // parte de "curvaAbc" porque combina os dois critérios numa chave só,
+    // em vez de reaproveitar o cache de cada curva individual (mais simples
+    // que orquestrar dependência entre duas entradas de cache diferentes).
+    @Cacheable(cacheNames = "matrizAbc", key = "#empresaId + '_' + #dias")
+    public List<MatrizAbcDTO> calcularMatrizFaturamentoLucratividade(Long empresaId, int dias) {
+        List<CurvaABCDTO> porFaturamento = calcular(empresaId, Criterio.FATURAMENTO, dias);
+        List<CurvaABCDTO> porLucratividade = calcular(empresaId, Criterio.LUCRATIVIDADE, dias);
+
+        Map<Long, String> classeLucratividadePorProduto = new HashMap<>();
+        for (CurvaABCDTO item : porLucratividade) {
+            classeLucratividadePorProduto.put(item.getProdutoId(), item.getClasse());
+        }
+
+        List<MatrizAbcDTO> resultado = new ArrayList<>();
+        for (CurvaABCDTO item : porFaturamento) {
+            String classeFat = item.getClasse();
+            String classeLucro = classeLucratividadePorProduto.getOrDefault(item.getProdutoId(), classeFat);
+
+            String quadrante;
+            if (classeFat.equals(classeLucro)) {
+                quadrante = "ALINHADO";
+            } else if ("A".equals(classeFat) && "C".equals(classeLucro)) {
+                quadrante = "CAMPEAO_DE_VENDAS"; // vende muito, lucra pouco
+            } else if ("C".equals(classeFat) && "A".equals(classeLucro)) {
+                quadrante = "MOTOR_DE_LUCRO"; // vende pouco, lucra muito
+            } else {
+                quadrante = "MISTO";
+            }
+
+            MatrizAbcDTO dto = new MatrizAbcDTO();
+            dto.setProdutoId(item.getProdutoId());
+            dto.setNomeProduto(item.getNomeProduto());
+            dto.setClasseFaturamento(classeFat);
+            dto.setClasseLucratividade(classeLucro);
+            dto.setQuadrante(quadrante);
+            resultado.add(dto);
+        }
+
+        return resultado;
     }
 }

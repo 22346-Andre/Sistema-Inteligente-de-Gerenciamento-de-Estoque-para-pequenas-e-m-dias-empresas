@@ -3,6 +3,7 @@ package com.smartstock.backend.controller;
 import com.smartstock.backend.dto.CurvaABCDTO;
 import com.smartstock.backend.dto.EstatisticasDTO;
 import com.smartstock.backend.dto.GiroEstoqueDTO;
+import com.smartstock.backend.dto.MatrizAbcDTO;
 import com.smartstock.backend.service.CurvaAbcService;
 import com.smartstock.backend.service.EstatisticasService;
 import com.smartstock.backend.service.GiroEstoqueService;
@@ -76,5 +77,20 @@ public class EstatisticasController {
         int diasSeguro = Math.max(1, Math.min(dias, 730));
 
         return giroEstoqueService.calcularPorProduto(empresaId, diasSeguro);
+    }
+
+    // Matriz Faturamento × Lucratividade ("Produto Engana-Bobo") — cruza as
+    // duas curvas de valor pra achar produto com classificação oposta nas
+    // duas (vende muito mas lucra pouco, ou vende pouco mas lucra muito).
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPER_ADMIN')")
+    @GetMapping("/matriz-abc")
+    public List<MatrizAbcDTO> obterMatrizAbc(
+            @RequestParam(defaultValue = "90") int dias) {
+        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Long empresaId = jwt.getClaim("empresaId");
+
+        int diasSeguro = Math.max(1, Math.min(dias, 730));
+
+        return curvaAbcService.calcularMatrizFaturamentoLucratividade(empresaId, diasSeguro);
     }
 }
