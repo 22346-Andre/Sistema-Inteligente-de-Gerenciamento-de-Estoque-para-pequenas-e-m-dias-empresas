@@ -781,7 +781,14 @@ public class RelatorioPdfService {
             document.add(titulo);
             
             String dataHora = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"));
-            Paragraph subtitulo = new Paragraph("Período: " + (dataInicio != null ? dataInicio : "Início") + " a " + (dataFim != null ? dataFim : "Fim") + "\nGerado em: " + dataHora + "\n\n");
+            // Antes mostrava "Período:  a " em branco quando nenhum filtro de
+            // data era escolhido — dataInicio/dataFim chegam como string vazia
+            // do frontend (não null), então o ternário original (dataInicio != null
+            // ? dataInicio : "Início") nunca caía no fallback.
+            String textoPeríodo = (dataInicio != null && !dataInicio.isBlank() && dataFim != null && !dataFim.isBlank())
+                    ? dataInicio + " a " + dataFim
+                    : "Todo o histórico";
+            Paragraph subtitulo = new Paragraph("Período: " + textoPeríodo + "\nGerado em: " + dataHora + "\n\n");
             subtitulo.setAlignment(Element.ALIGN_CENTER);
             document.add(subtitulo);
             
@@ -802,8 +809,20 @@ public class RelatorioPdfService {
                 cellQtd.setHorizontalAlignment(Element.ALIGN_CENTER);
                 table.addCell(cellQtd);
             }
-            
+
             document.add(table);
+
+            // Tabela vazia sem nenhuma explicação parece bug pro usuário —
+            // deixa explícito que realmente não há movimentação registrada
+            // pra essa empresa/período, em vez de uma página em branco.
+            if (produtosMovimentados.isEmpty()) {
+                Paragraph semDados = new Paragraph(
+                        "\nNenhuma movimentação de estoque encontrada" +
+                        (limites != null ? " no período selecionado." : " para esta empresa."));
+                semDados.setAlignment(Element.ALIGN_CENTER);
+                document.add(semDados);
+            }
+
             document.close();
             
         } catch (DocumentException e) {
