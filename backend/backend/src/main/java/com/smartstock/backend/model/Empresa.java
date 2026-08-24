@@ -33,6 +33,13 @@ public class Empresa {
 
     private LocalDateTime ultimoAcesso = LocalDateTime.now(); // Já começa com a data de hoje ao criar
 
+    // Data em que o e-mail de aviso de inatividade ("sua conta vai ser
+    // apagada em 30 dias") foi enviado — null enquanto nenhum aviso foi
+    // disparado. Ver CleanService: usado pra não reenviar o aviso todo dia
+    // e pra saber quando os 30 dias de carência terminaram.
+    @Column(name = "aviso_inatividade_enviado_em")
+    private LocalDateTime avisoInatividadeEnviadoEm;
+
  
     @Column(name = "dias_estoque_morto")
     private Integer diasParaEstoqueMorto = 90;

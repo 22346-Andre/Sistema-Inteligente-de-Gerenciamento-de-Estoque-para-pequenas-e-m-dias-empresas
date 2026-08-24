@@ -102,7 +102,7 @@ public class EmailService {
             long atencao = sugestoes.stream().filter(s -> "ATENCAO".equals(s.getUrgencia())).count();
             long total = sugestoes.size();
 
-            String assunto = "\uD83D\uDCCA Resumo de Estoque e Sugestoes de Compra - SmartStock";
+            String assunto = "\uD83D\uDCCA Resumo de Estoque e Sugestoes de Compra - EstoqueMax";
             String corpoEmail = "Ola, Gestor!\n\n"
                     + "O seu relatorio diario de estoque foi gerado com sucesso.\n\n"
                     + "RESUMO DA SITUACAO:\n"
@@ -112,11 +112,11 @@ public class EmailService {
                     + "Em anexo, voce encontrara a planilha completa com as quantidades exatas "
                     + "que precisam ser compradas (ja com a margem de seguranca e calculo da IA).\n\n"
                     + "Atenciosamente,\n"
-                    + "Robo do SmartStock";
+                    + "Robo do EstoqueMax";
 
             byte[] planilhaBytes = sugestaoCompraService.gerarPlanilhaCsvPorEmpresa(empresaId);
 
-            enviarViaBrevo(emailDestino, assunto, corpoEmail, "Planilha_Compras_SmartStock.csv", planilhaBytes);
+            enviarViaBrevo(emailDestino, assunto, corpoEmail, "Planilha_Compras_EstoqueMax.csv", planilhaBytes);
             logger.info("E-mail automatico com RESUMO enviado com sucesso para empresaId={} destino={}", empresaId, emailDestino);
 
         } catch (Exception e) {
@@ -131,7 +131,7 @@ public class EmailService {
     public void enviarResumoComPlanilha(String emailDestino, String assunto, String texto, Long empresaId) {
         try {
             byte[] planilhaBytes = sugestaoCompraService.gerarPlanilhaCsvPorEmpresa(empresaId);
-            enviarViaBrevo(emailDestino, assunto, texto, "Planilha_Compras_SmartStock.csv", planilhaBytes);
+            enviarViaBrevo(emailDestino, assunto, texto, "Planilha_Compras_EstoqueMax.csv", planilhaBytes);
             logger.info("E-mail inteligente enviado com sucesso para empresaId={} destino={}", empresaId, emailDestino);
         } catch (Exception e) {
             logger.error("Falha ao enviar e-mail inteligente para empresaId={} destino={}", empresaId, emailDestino, e);
@@ -141,13 +141,13 @@ public class EmailService {
     
     public void enviarCodigoVerificacaoCadastro(String emailDestino, String nomeDono, String codigo) throws Exception {
         String corpoEmail = "Ola" + (nomeDono != null && !nomeDono.isBlank() ? ", " + nomeDono : "") + "!\n\n"
-                + "Use o codigo abaixo para confirmar seu e-mail e concluir o cadastro no SmartStock:\n\n"
+                + "Use o codigo abaixo para confirmar seu e-mail e concluir o cadastro no EstoqueMax:\n\n"
                 + "        " + codigo + "\n\n"
                 + "Esse codigo e valido por 15 minutos. Se voce nao solicitou este cadastro, pode ignorar este e-mail.\n\n"
                 + "Atenciosamente,\n"
-                + "Equipe SmartStock";
+                + "Equipe EstoqueMax";
 
-        enviarViaBrevo(emailDestino, "Seu codigo de confirmacao - SmartStock", corpoEmail, null, null);
+        enviarViaBrevo(emailDestino, "Seu codigo de confirmacao - EstoqueMax", corpoEmail, null, null);
         logger.info("Codigo de verificacao de cadastro enviado para destino={}", emailDestino);
     }
 
@@ -158,18 +158,46 @@ public class EmailService {
     public void enviarEmailRecuperacaoSenha(String emailDestino, String nomeDono, String linkRecuperacao) {
         try {
             String corpoEmail = "Ola" + (nomeDono != null && !nomeDono.isBlank() ? ", " + nomeDono : "") + "!\n\n"
-                    + "Recebemos um pedido para redefinir a sua senha no SmartStock.\n\n"
+                    + "Recebemos um pedido para redefinir a sua senha no EstoqueMax.\n\n"
                     + "Clique no link abaixo para escolher uma nova senha. Esse link e valido por 1 hora:\n\n"
                     + linkRecuperacao + "\n\n"
                     + "Se voce nao pediu essa redefinicao, pode ignorar este e-mail com seguranca - "
                     + "sua senha atual continua valida e nada foi alterado.\n\n"
                     + "Atenciosamente,\n"
-                    + "Equipe SmartStock";
+                    + "Equipe EstoqueMax";
 
-            enviarViaBrevo(emailDestino, "Recuperacao de senha - SmartStock", corpoEmail, null, null);
+            enviarViaBrevo(emailDestino, "Recuperacao de senha - EstoqueMax", corpoEmail, null, null);
             logger.info("E-mail de recuperacao de senha enviado para destino={}", emailDestino);
         } catch (Exception e) {
             logger.error("Falha ao enviar e-mail de recuperacao de senha para destino={}", emailDestino, e);
+        }
+    }
+
+    // ========================================================================
+    // Aviso de inatividade — disparado por CleanService quando uma empresa
+    // se aproxima do prazo de exclusão por inatividade. Dá 30 dias de
+    // carência: a conta só é apagada de verdade se ninguém logar nesse
+    // intervalo depois do aviso.
+    // ========================================================================
+    @Async("emailExecutor")
+    public void enviarAvisoInatividade(String emailDestino, String nomeFantasia) {
+        try {
+            String nomeEmpresa = (nomeFantasia != null && !nomeFantasia.isBlank()) ? nomeFantasia : "sua empresa";
+            String corpoEmail = "Ola!\n\n"
+                    + "Notamos que ninguem acessa a conta de " + nomeEmpresa + " no EstoqueMax ha um bom tempo.\n\n"
+                    + "Para manter o banco de dados organizado, contas sem nenhum acesso por um periodo prolongado "
+                    + "sao removidas. Sua conta esta agendada para exclusao em 30 dias a partir de hoje.\n\n"
+                    + "Se voce ainda usa o EstoqueMax, basta fazer login normalmente antes desse prazo - isso e "
+                    + "suficiente para cancelar a exclusao automaticamente, nenhuma acao extra e necessaria.\n\n"
+                    + "Se voce nao pretende mais usar o sistema, nao e preciso fazer nada; a conta sera removida "
+                    + "apos o prazo.\n\n"
+                    + "Atenciosamente,\n"
+                    + "Equipe EstoqueMax";
+
+            enviarViaBrevo(emailDestino, "Sua conta EstoqueMax sera removida em 30 dias por inatividade", corpoEmail, null, null);
+            logger.info("E-mail de aviso de inatividade enviado para destino={}", emailDestino);
+        } catch (Exception e) {
+            logger.error("Falha ao enviar e-mail de aviso de inatividade para destino={}", emailDestino, e);
         }
     }
 
@@ -181,7 +209,7 @@ public class EmailService {
     public void enviarEmailTeste(String emailDestino) throws Exception {
         enviarViaBrevo(
                 emailDestino,
-                "Teste de e-mail - SmartStock",
+                "Teste de e-mail - EstoqueMax",
                 "Se voce recebeu isto, o envio de e-mail (via Brevo) esta funcionando corretamente.",
                 null, null
         );

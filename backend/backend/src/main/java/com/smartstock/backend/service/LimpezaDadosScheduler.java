@@ -14,19 +14,7 @@ public class LimpezaDadosScheduler {
 
     private final MovimentacaoRepository movimentacaoRepository;
 
-    // ⚠️ DESLIGADO POR PADRÃO. Esse job rodava todo dia às 3h apagando
-    // PERMANENTEMENTE qualquer Movimentacao com mais de 7 dias, de TODAS as
-    // empresas — sem distinção. Isso destruía o histórico que Curva ABC,
-    // Giro de Estoque, Estoque Morto e os relatórios em PDF precisam (todos
-    // olham janelas de 30/90 dias); com retenção de 7 dias, essas análises
-    // nunca tinham chance de funcionar de verdade. Além do impacto no
-    // sistema, é literalmente o histórico de vendas do negócio — para fins
-    // fiscais/contábeis no Brasil, esse tipo de registro normalmente precisa
-    // ser mantido por anos, não dias.
-    // Se um dia precisar reativar (ex.: banco de homologação/teste enchendo
-    // demais), configure LIMPEZA_MOVIMENTACOES_ENABLED=true e
-    // LIMPEZA_MOVIMENTACOES_DIAS_RETENCAO no ambiente (nunca em produção com
-    // dado real sem ter certeza absoluta do período de retenção exigido).
+    // ⚠️ DESLIGADO POR PADRÃO. 
     @Value("${limpeza.movimentacoes.enabled:false}")
     private boolean limpezaHabilitada;
 
