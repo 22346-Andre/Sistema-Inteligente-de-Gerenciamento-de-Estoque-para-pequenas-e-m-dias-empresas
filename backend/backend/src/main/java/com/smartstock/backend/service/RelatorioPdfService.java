@@ -11,6 +11,7 @@ import com.smartstock.backend.model.Empresa;
 import com.smartstock.backend.model.Movimentacao;
 import com.smartstock.backend.model.Produto;
 import com.smartstock.backend.model.TipoMovimentacao;
+import com.smartstock.backend.repository.DespesaRepository;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.MovimentacaoRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
@@ -37,11 +38,14 @@ public class RelatorioPdfService {
     private final ProdutoRepository produtoRepository;
     private final MovimentacaoRepository movimentacaoRepository;
     private final EmpresaRepository empresaRepository;
+    private final DespesaRepository despesaRepository;
 
-    public RelatorioPdfService(ProdutoRepository produtoRepository, MovimentacaoRepository movimentacaoRepository, EmpresaRepository empresaRepository) {
+    public RelatorioPdfService(ProdutoRepository produtoRepository, MovimentacaoRepository movimentacaoRepository,
+                                EmpresaRepository empresaRepository, DespesaRepository despesaRepository) {
         this.produtoRepository = produtoRepository;
         this.movimentacaoRepository = movimentacaoRepository;
         this.empresaRepository = empresaRepository;
+        this.despesaRepository = despesaRepository;
     }
 
     private Empresa getEmpresaLogada() {
@@ -385,6 +389,117 @@ public class RelatorioPdfService {
         }
         return out.toByteArray();
     }
+
+    /**
+     * Relatório Contábil (DRE simplificado): Receita Bruta − CMV = Lucro
+     * Bruto, menos Despesas Operacionais (pagas no período) e Perdas por
+     * quebra/avaria. Ainda é "simplificado" — não inclui tributos sobre o
+     * lucro nem outras contas do plano de contas —, mas com o módulo de
+     * Despesas agora fecha um resultado operacional de verdade, não mais
+     * uma aproximação que ignorava custo fixo do negócio.
+     */
+    public byte[] gerarRelatorioContabilPdf(String dataInicio, String dataFim) {
+        Empresa empresa = getEmpresaLogada();
+        LocalDateTime[] limites = validarEParsearDatas(dataInicio, dataFim);
+        // Sem filtro de data = todo o histórico. As agregações usam BETWEEN,
+        // então precisam de limites concretos mesmo quando o usuário não
+        // escolheu nenhum — 01/01/2000 cobre qualquer dado real do sistema.
+        LocalDateTime dataInicioEfetiva = limites != null ? limites[0] : LocalDateTime.of(2000, 1, 1, 0, 0);
+        LocalDateTime dataFimEfetiva = limites != null ? limites[1] : LocalDateTime.now();
+
+        BigDecimal receitaBruta = movimentacaoRepository.somarFaturamentoNoIntervalo(empresa.getId(), dataInicioEfetiva, dataFimEfetiva);
+        BigDecimal cmv = movimentacaoRepository.somarCmvNoIntervalo(empresa.getId(), dataInicioEfetiva, dataFimEfetiva);
+        BigDecimal perdas = movimentacaoRepository.somarPerdasNoIntervalo(empresa.getId(), dataInicioEfetiva, dataFimEfetiva);
+        BigDecimal despesasPagas = despesaRepository.somarDespesasPagasNoIntervalo(
+                empresa.getId(), dataInicioEfetiva.toLocalDate(), dataFimEfetiva.toLocalDate());
+        BigDecimal lucroBruto = receitaBruta.subtract(cmv);
+        BigDecimal resultadoOperacional = lucroBruto.subtract(despesasPagas).subtract(perdas);
+        BigDecimal margemBrutaPct = receitaBruta.compareTo(BigDecimal.ZERO) > 0
+                ? lucroBruto.divide(receitaBruta, 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100))
+                : BigDecimal.ZERO;
+
+        Document document = new Document(PageSize.A4);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        try {
+            PdfWriter.getInstance(document, out);
+            document.open();
+
+            Font fontTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
+            Paragraph titulo = new Paragraph("Relatório Contábil (DRE Simplificado) - " + empresa.getNomeFantasia().toUpperCase(), fontTitulo);
+            titulo.setAlignment(Element.ALIGN_CENTER);
+            document.add(titulo);
+
+            String dataHora = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"));
+            String textoPeriodo = (limites != null)
+                    ? dataInicioEfetiva.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + " a " + dataFimEfetiva.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                    : "Todo o histórico";
+            Paragraph subtitulo = new Paragraph("Período: " + textoPeriodo + "\nGerado em: " + dataHora + "\n\n");
+            subtitulo.setAlignment(Element.ALIGN_CENTER);
+            document.add(subtitulo);
+
+            Font fontLinha = FontFactory.getFont(FontFactory.HELVETICA, 11);
+            Font fontLinhaNegrito = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11);
+            Font fontResultado = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 13);
+
+            PdfPTable table = new PdfPTable(2);
+            table.setWidthPercentage(100);
+            table.setWidths(new float[]{3f, 1.4f});
+            table.setSpacingBefore(10);
+
+            adicionarLinhaDre(table, "Receita Bruta de Vendas", receitaBruta, fontLinha, false);
+            adicionarLinhaDre(table, "(-) CMV (Custo das Mercadorias Vendidas)", cmv.negate(), fontLinha, false);
+            adicionarLinhaDre(table, "(=) Lucro Bruto", lucroBruto, fontLinhaNegrito, true);
+            adicionarLinhaDre(table, "(-) Despesas Operacionais pagas no período", despesasPagas.negate(), fontLinha, false);
+            adicionarLinhaDre(table, "(-) Perdas por Quebra/Avaria no período", perdas.negate(), fontLinha, false);
+            adicionarLinhaDre(table, "(=) Resultado Operacional do Período", resultadoOperacional, fontResultado, true);
+
+            document.add(table);
+
+            Paragraph margem = new Paragraph("\nMargem Bruta: " + String.format("%.2f", margemBrutaPct) + "%", fontLinhaNegrito);
+            document.add(margem);
+
+            // Contas a Pagar em aberto não entra no resultado do período (é
+            // Passivo, não despesa incorrida) — mostrado à parte, como
+            // informação complementar de saúde financeira.
+            BigDecimal contasAPagarEmAberto = despesaRepository.somarContasAPagarEmAberto(empresa.getId());
+            Paragraph passivo = new Paragraph(
+                    "Contas a Pagar em aberto (não incluídas no resultado acima): R$ " + String.format("%.2f", contasAPagarEmAberto),
+                    fontLinha);
+            document.add(passivo);
+
+            Font fontAviso = FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 8);
+            Paragraph aviso = new Paragraph(
+                    "\n\nEste é um relatório gerencial simplificado, não um Demonstrativo de Resultado do Exercício (DRE) " +
+                    "oficial para fins contábeis/fiscais. Ele não inclui tributos sobre o lucro nem outras contas do " +
+                    "plano de contas da empresa — o sistema não rastreia essas " +
+                    "informações. Para o DRE oficial e demais demonstrações contábeis, consulte o contador responsável.",
+                    fontAviso);
+            document.add(aviso);
+
+            document.close();
+        } catch (DocumentException e) {
+            e.printStackTrace();
+        }
+        return out.toByteArray();
+    }
+
+    private void adicionarLinhaDre(PdfPTable table, String rotulo, BigDecimal valor, Font font, boolean linhaDeStaque) {
+        PdfPCell celulaRotulo = new PdfPCell(new Phrase(rotulo, font));
+        celulaRotulo.setBorder(linhaDeStaque ? Rectangle.TOP : Rectangle.NO_BORDER);
+        celulaRotulo.setPaddingTop(4);
+        celulaRotulo.setPaddingBottom(4);
+        table.addCell(celulaRotulo);
+
+        String valorFormatado = "R$ " + String.format("%.2f", valor);
+        PdfPCell celulaValor = new PdfPCell(new Phrase(valorFormatado, font));
+        celulaValor.setBorder(linhaDeStaque ? Rectangle.TOP : Rectangle.NO_BORDER);
+        celulaValor.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        celulaValor.setPaddingTop(4);
+        celulaValor.setPaddingBottom(4);
+        table.addCell(celulaValor);
+    }
+
     public byte[] gerarRelatorioPerdasPdf(String dataInicio, String dataFim) {
         Empresa empresa = getEmpresaLogada();
 

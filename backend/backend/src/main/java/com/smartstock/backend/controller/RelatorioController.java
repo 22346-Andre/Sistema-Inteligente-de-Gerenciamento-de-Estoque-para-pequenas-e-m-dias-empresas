@@ -63,6 +63,19 @@ public class RelatorioController {
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
 
+    @GetMapping("/contabil/pdf")
+    public ResponseEntity<byte[]> descarregarContabilPdf(
+            @RequestParam(required = false) String dataInicio,
+            @RequestParam(required = false) String dataFim) {
+        byte[] pdfBytes = relatorioPdfService.gerarRelatorioContabilPdf(dataInicio, dataFim);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "relatorio_contabil_smartstock.pdf");
+
+        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+    }
+
     @GetMapping("/perdas/pdf")
     public ResponseEntity<byte[]> descarregarPerdasPdf(
             @RequestParam(required = false) String dataInicio,

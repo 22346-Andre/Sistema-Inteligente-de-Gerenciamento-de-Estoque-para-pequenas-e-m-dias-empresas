@@ -102,4 +102,33 @@ Integer sumSaidasPorProdutoUltimosDias(@Param("produtoId") Long produtoId,
            "WHERE m.produto.fornecedor.id = :fornecedorId AND m.empresa.id = :empresaId AND m.tipo = 'ENTRADA' " +
            "ORDER BY m.dataMovimentacao ASC")
     List<LocalDateTime> findDatasEntradaPorFornecedor(@Param("fornecedorId") Long fornecedorId, @Param("empresaId") Long empresaId);
+
+    // ==== Agregados para o Relatório Contábil (DRE simplificado) ====
+    // Diferente das somas "últimos N dias" acima, essas recebem um
+    // intervalo [inicio, fim] explícito — o relatório contábil trabalha
+    // com o período escolhido na tela de Relatórios, não com uma janela
+    // relativa a "agora". Mesma exclusão de Uso Interno das outras análises
+    // de valor: ativo fixo não é receita nem custo de mercadoria vendida.
+
+    // Receita Bruta de Vendas no período.
+    @Query("SELECT COALESCE(SUM(m.quantidade * COALESCE(NULLIF(m.produto.precoVenda, 0), m.produto.precoCusto, 0)), 0) " +
+           "FROM Movimentacao m WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' " +
+           "AND m.dataMovimentacao BETWEEN :inicio AND :fim " +
+           "AND (m.produto.finalidadeEstoque IS NULL OR m.produto.finalidadeEstoque <> 'USO_INTERNO')")
+    java.math.BigDecimal somarFaturamentoNoIntervalo(@Param("empresaId") Long empresaId, @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
+
+    // CMV (Custo das Mercadorias Vendidas) no período — quantidade vendida × custo unitário.
+    @Query("SELECT COALESCE(SUM(m.quantidade * COALESCE(m.produto.precoCusto, 0)), 0) " +
+           "FROM Movimentacao m WHERE m.empresa.id = :empresaId AND m.tipo = 'SAIDA' " +
+           "AND m.dataMovimentacao BETWEEN :inicio AND :fim " +
+           "AND (m.produto.finalidadeEstoque IS NULL OR m.produto.finalidadeEstoque <> 'USO_INTERNO')")
+    java.math.BigDecimal somarCmvNoIntervalo(@Param("empresaId") Long empresaId, @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
+
+    // Perdas por quebra/avaria/vencimento no período, valorizadas a custo —
+    // mesma lógica que o card "Prejuízo por Perdas" do Dashboard já usa,
+    // só que agregada no banco em vez de somada no frontend.
+    @Query("SELECT COALESCE(SUM(m.quantidade * COALESCE(m.produto.precoCusto, 0)), 0) " +
+           "FROM Movimentacao m WHERE m.empresa.id = :empresaId AND m.tipo = 'QUEBRA_PERDA' " +
+           "AND m.dataMovimentacao BETWEEN :inicio AND :fim")
+    java.math.BigDecimal somarPerdasNoIntervalo(@Param("empresaId") Long empresaId, @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
 }
