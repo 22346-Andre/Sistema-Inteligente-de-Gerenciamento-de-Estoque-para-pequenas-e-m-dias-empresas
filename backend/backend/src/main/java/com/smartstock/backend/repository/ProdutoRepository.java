@@ -64,6 +64,16 @@ public interface ProdutoRepository extends JpaRepository<Produto, Long>, JpaSpec
            "AND (p.finalidadeEstoque IS NULL OR p.finalidadeEstoque <> 'USO_INTERNO')")
     BigDecimal calcularValorTotalEstoque(@Param("empresaId") Long empresaId);
 
+    // Ativo Não Circulante (Imobilizado) do Balanço Patrimonial — o oposto
+    // do calcularValorTotalEstoque acima: soma só os itens de Uso Interno
+    // (mobiliário, equipamento próprio), que são ativo fixo, não estoque de
+    // giro. Sem controle de depreciação — o valor é sempre o de aquisição
+    // (custo), não o valor contábil líquido; o relatório avisa essa
+    // limitação no rodapé.
+    @Query("SELECT COALESCE(SUM(p.precoCusto * p.quantidade), 0) FROM Produto p WHERE p.empresa.id = :empresaId " +
+           "AND p.finalidadeEstoque = 'USO_INTERNO'")
+    BigDecimal calcularValorImobilizado(@Param("empresaId") Long empresaId);
+
     // ALERTA 3: Produtos encalhados (com estoque > 0, mas sem saída recente).
     //  soma a condição "p.dataCriacao <= :dataLimite" pra não marcar
     // como morto um produto que acabou de ser cadastrado e ainda nem teve tempo

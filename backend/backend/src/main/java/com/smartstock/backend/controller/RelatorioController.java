@@ -89,6 +89,19 @@ public class RelatorioController {
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
 
+    // Balanço Patrimonial é sempre uma fotografia de agora — sem parâmetros
+    // de data, diferente dos outros relatórios.
+    @GetMapping("/balanco-patrimonial/pdf")
+    public ResponseEntity<byte[]> descarregarBalancoPatrimonialPdf() {
+        byte[] pdfBytes = relatorioPdfService.gerarRelatorioBalancoPatrimonialPdf();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "balanco_patrimonial_smartstock.pdf");
+
+        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+    }
+
     @GetMapping("/perdas/pdf")
     public ResponseEntity<byte[]> descarregarPerdasPdf(
             @RequestParam(required = false) String dataInicio,

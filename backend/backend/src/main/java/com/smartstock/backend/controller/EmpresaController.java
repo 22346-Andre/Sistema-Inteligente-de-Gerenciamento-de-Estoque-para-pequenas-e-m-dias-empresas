@@ -91,6 +91,13 @@ public class EmpresaController {
       
         minhaEmpresa.setChavePix(dtoAtualizacao.getChavePix());
 
+        // Só aplica se vier valor — mesmo raciocínio do diasParaEstoqueMorto
+        // acima: um form antigo que não manda esse campo não deve zerar o
+        // que já estava configurado.
+        if (dtoAtualizacao.getCapitalSocial() != null) {
+            minhaEmpresa.setCapitalSocial(dtoAtualizacao.getCapitalSocial());
+        }
+
         // Salva a alteração no banco de dados
         Empresa empresaAtualizada = empresaRepository.save(minhaEmpresa);
 

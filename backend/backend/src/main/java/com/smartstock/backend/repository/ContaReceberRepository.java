@@ -26,4 +26,11 @@ public interface ContaReceberRepository extends JpaRepository<ContaReceber, Long
 
     //  Usado pelo webhook da Delfinance pra achar qual fiado foi pago
     java.util.Optional<ContaReceber> findByPixCorrelationId(String pixCorrelationId);
+
+    // Ativo Circulante do Balanço Patrimonial: soma de tudo que ainda está
+    // pendente de recebimento (PENDENTE ou ATRASADO) — dinheiro que a
+    // empresa tem a receber de clientes, mas ainda não recebeu.
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(c.valor), 0) FROM ContaReceber c " +
+           "WHERE c.empresa.id = :empresaId AND c.status IN ('PENDENTE', 'ATRASADO')")
+    java.math.BigDecimal somarContasAReceberEmAberto(@org.springframework.data.repository.query.Param("empresaId") Long empresaId);
 }

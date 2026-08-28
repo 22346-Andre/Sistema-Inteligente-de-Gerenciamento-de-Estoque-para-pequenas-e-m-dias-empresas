@@ -12,6 +12,7 @@ import com.smartstock.backend.model.Movimentacao;
 import com.smartstock.backend.model.Produto;
 import com.smartstock.backend.model.TipoMovimentacao;
 import com.smartstock.backend.repository.DespesaRepository;
+import com.smartstock.backend.repository.ContaReceberRepository;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.MovimentacaoRepository;
 import com.smartstock.backend.repository.MovimentoCaixaRepository;
@@ -41,15 +42,17 @@ public class RelatorioPdfService {
     private final EmpresaRepository empresaRepository;
     private final DespesaRepository despesaRepository;
     private final MovimentoCaixaRepository movimentoCaixaRepository;
+    private final ContaReceberRepository contaReceberRepository;
 
     public RelatorioPdfService(ProdutoRepository produtoRepository, MovimentacaoRepository movimentacaoRepository,
                                 EmpresaRepository empresaRepository, DespesaRepository despesaRepository,
-                                MovimentoCaixaRepository movimentoCaixaRepository) {
+                                MovimentoCaixaRepository movimentoCaixaRepository, ContaReceberRepository contaReceberRepository) {
         this.produtoRepository = produtoRepository;
         this.movimentacaoRepository = movimentacaoRepository;
         this.empresaRepository = empresaRepository;
         this.despesaRepository = despesaRepository;
         this.movimentoCaixaRepository = movimentoCaixaRepository;
+        this.contaReceberRepository = contaReceberRepository;
     }
 
     private Empresa getEmpresaLogada() {
@@ -623,6 +626,135 @@ public class RelatorioPdfService {
             case "RETIRADA_SOCIO" -> "Retirada de Sócio";
             default -> "Outro";
         };
+    }
+
+    /**
+     * Balanço Patrimonial simplificado, na data de hoje (o Balanço é sempre
+     * uma fotografia de um instante, não de um período — por isso não tem
+     * filtro de data como os outros relatórios).
+     *
+     * Ativo = Passivo + Patrimônio Líquido, na teoria — aqui os dois lados
+     * são calculados de forma INDEPENDENTE (um a partir do estoque/caixa/
+     * contas a receber reais, o outro a partir de capital social + resultado
+     * histórico acumulado), então uma pequena diferença de fechamento é
+     * esperada e mostrada explicitamente, em vez de forçar os números a
+     * baterem artificialmente. As causas mais prováveis de diferença:
+     * despesas ainda não registradas no sistema, imobilizado sem
+     * depreciação, ou o capital social não refletir exatamente o histórico
+     * de aportes registrados no Caixa.
+     */
+    public byte[] gerarRelatorioBalancoPatrimonialPdf() {
+        Empresa empresa = getEmpresaLogada();
+        LocalDateTime inicioDosTempos = LocalDateTime.of(2000, 1, 1, 0, 0);
+        LocalDateTime agora = LocalDateTime.now();
+
+        // ==== ATIVO ====
+        BigDecimal estoques = produtoRepository.calcularValorTotalEstoque(empresa.getId());
+        BigDecimal contasAReceber = contaReceberRepository.somarContasAReceberEmAberto(empresa.getId());
+        BigDecimal disponibilidades = movimentoCaixaRepository.calcularSaldoAtual(empresa.getId());
+        BigDecimal ativoCirculante = estoques.add(contasAReceber).add(disponibilidades);
+
+        BigDecimal imobilizado = produtoRepository.calcularValorImobilizado(empresa.getId());
+        BigDecimal ativoNaoCirculante = imobilizado;
+
+        BigDecimal ativoTotal = ativoCirculante.add(ativoNaoCirculante);
+
+        // ==== PASSIVO ====
+        BigDecimal contasAPagar = despesaRepository.somarContasAPagarEmAberto(empresa.getId());
+        BigDecimal passivoCirculante = contasAPagar;
+
+        // ==== PATRIMÔNIO LÍQUIDO ====
+        BigDecimal capitalSocial = empresa.getCapitalSocial() != null ? empresa.getCapitalSocial() : BigDecimal.ZERO;
+
+        // Lucros Acumulados = resultado operacional de TODO o histórico (mesma
+        // fórmula do DRE, sem filtro de período): Receita − CMV − Despesas
+        // Pagas − Perdas, desde o primeiro registro até hoje.
+        BigDecimal receitaHistorica = movimentacaoRepository.somarFaturamentoNoIntervalo(empresa.getId(), inicioDosTempos, agora);
+        BigDecimal cmvHistorico = movimentacaoRepository.somarCmvNoIntervalo(empresa.getId(), inicioDosTempos, agora);
+        BigDecimal perdasHistoricas = movimentacaoRepository.somarPerdasNoIntervalo(empresa.getId(), inicioDosTempos, agora);
+        BigDecimal despesasHistoricas = despesaRepository.somarDespesasPagasNoIntervalo(empresa.getId(), inicioDosTempos.toLocalDate(), agora.toLocalDate());
+        BigDecimal lucrosAcumulados = receitaHistorica.subtract(cmvHistorico).subtract(despesasHistoricas).subtract(perdasHistoricas);
+
+        BigDecimal patrimonioLiquido = capitalSocial.add(lucrosAcumulados);
+
+        BigDecimal passivoMaisPl = passivoCirculante.add(patrimonioLiquido);
+        BigDecimal diferencaFechamento = ativoTotal.subtract(passivoMaisPl);
+
+        Document document = new Document(PageSize.A4);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        try {
+            PdfWriter.getInstance(document, out);
+            document.open();
+
+            Font fontTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
+            Paragraph titulo = new Paragraph("Balanço Patrimonial Simplificado - " + empresa.getNomeFantasia().toUpperCase(), fontTitulo);
+            titulo.setAlignment(Element.ALIGN_CENTER);
+            document.add(titulo);
+
+            String dataHora = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"));
+            Paragraph subtitulo = new Paragraph("Posição em: " + dataHora + "\n\n");
+            subtitulo.setAlignment(Element.ALIGN_CENTER);
+            document.add(subtitulo);
+
+            Font fontLinha = FontFactory.getFont(FontFactory.HELVETICA, 11);
+            Font fontLinhaNegrito = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11);
+            Font fontSecao = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 13);
+
+            PdfPTable table = new PdfPTable(2);
+            table.setWidthPercentage(100);
+            table.setWidths(new float[]{3f, 1.4f});
+            table.setSpacingBefore(10);
+
+            adicionarSecaoBalanco(table, "ATIVO", fontSecao);
+            adicionarLinhaDre(table, "Ativo Circulante", ativoCirculante, fontLinhaNegrito, false);
+            adicionarLinhaDre(table, "   Estoques", estoques, fontLinha, false);
+            adicionarLinhaDre(table, "   Contas a Receber (Fiado em aberto)", contasAReceber, fontLinha, false);
+            adicionarLinhaDre(table, "   Disponibilidades (Caixa)", disponibilidades, fontLinha, false);
+            adicionarLinhaDre(table, "Ativo Não Circulante (Imobilizado)", ativoNaoCirculante, fontLinhaNegrito, false);
+            adicionarLinhaDre(table, "(=) Ativo Total", ativoTotal, fontLinhaNegrito, true);
+
+            adicionarSecaoBalanco(table, "PASSIVO", fontSecao);
+            adicionarLinhaDre(table, "Passivo Circulante (Contas a Pagar em aberto)", passivoCirculante, fontLinhaNegrito, false);
+
+            adicionarSecaoBalanco(table, "PATRIMÔNIO LÍQUIDO", fontSecao);
+            adicionarLinhaDre(table, "   Capital Social", capitalSocial, fontLinha, false);
+            adicionarLinhaDre(table, "   Lucros/Prejuízos Acumulados", lucrosAcumulados, fontLinha, false);
+            adicionarLinhaDre(table, "(=) Patrimônio Líquido", patrimonioLiquido, fontLinhaNegrito, false);
+            adicionarLinhaDre(table, "(=) Passivo + Patrimônio Líquido", passivoMaisPl, fontLinhaNegrito, true);
+
+            document.add(table);
+
+            Font fontDiferenca = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11);
+            Paragraph diferenca = new Paragraph(
+                    "\nDiferença de fechamento (Ativo − (Passivo + PL)): R$ " + String.format("%.2f", diferencaFechamento),
+                    fontDiferenca);
+            document.add(diferenca);
+
+            Font fontAviso = FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 8);
+            Paragraph aviso = new Paragraph(
+                    "\n\nBalanço Patrimonial simplificado — Ativo e Patrimônio Líquido são calculados de forma " +
+                    "independente (um a partir do estoque/caixa/contas a receber reais, o outro a partir do capital " +
+                    "social informado manualmente e do resultado histórico de vendas), então uma diferença de " +
+                    "fechamento é esperada e não indica erro do sistema. O Imobilizado não tem depreciação calculada " +
+                    "(fica sempre pelo valor de aquisição). Para o Balanço oficial, consulte o contador responsável.",
+                    fontAviso);
+            document.add(aviso);
+
+            document.close();
+        } catch (DocumentException e) {
+            e.printStackTrace();
+        }
+        return out.toByteArray();
+    }
+
+    private void adicionarSecaoBalanco(PdfPTable table, String titulo, Font fonte) {
+        PdfPCell secao = new PdfPCell(new Phrase(titulo, fonte));
+        secao.setColspan(2);
+        secao.setBorder(Rectangle.NO_BORDER);
+        secao.setPaddingTop(14);
+        secao.setPaddingBottom(4);
+        table.addCell(secao);
     }
 
     public byte[] gerarRelatorioPerdasPdf(String dataInicio, String dataFim) {

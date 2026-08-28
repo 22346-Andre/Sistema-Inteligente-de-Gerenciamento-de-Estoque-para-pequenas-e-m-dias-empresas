@@ -52,6 +52,13 @@ public class Empresa {
     @Column(name = "chave_pix")
     private String chavePix;
 
+    // Capital Social — preenchido manualmente pelo dono do negócio, o
+    // sistema não tem como descobrir isso sozinho. Usado no Balanço
+    // Patrimonial (compõe o Patrimônio Líquido, junto com Lucros
+    // Acumulados, que esse sim é calculado a partir do histórico de vendas).
+    @Column(name = "capital_social")
+    private java.math.BigDecimal capitalSocial;
+
     @PrePersist
     protected void gerarWebhookSecret() {
         if (this.webhookSecret == null) {
