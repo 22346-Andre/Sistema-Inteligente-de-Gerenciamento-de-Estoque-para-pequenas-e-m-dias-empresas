@@ -5,6 +5,7 @@ import com.smartstock.backend.exception.AcessoNegadoException;
 import com.smartstock.backend.exception.RecursoNaoEncontradoException;
 import com.smartstock.backend.model.ContaReceber;
 import com.smartstock.backend.model.Empresa;
+import com.smartstock.backend.model.OrigemCaixa;
 import com.smartstock.backend.model.StatusConta;
 import com.smartstock.backend.repository.ContaReceberRepository;
 import com.smartstock.backend.repository.EmpresaRepository;
@@ -27,13 +28,15 @@ public class FiadoService {
     private final EmpresaRepository empresaRepository;
     private final PixService pixService;
     private final DelfinanceClient delfinanceClient;
+    private final CaixaService caixaService;
 
     public FiadoService(ContaReceberRepository contaRepository, EmpresaRepository empresaRepository,
-                         PixService pixService, DelfinanceClient delfinanceClient) {
+                         PixService pixService, DelfinanceClient delfinanceClient, CaixaService caixaService) {
         this.contaRepository = contaRepository;
         this.empresaRepository = empresaRepository;
         this.pixService = pixService;
         this.delfinanceClient = delfinanceClient;
+        this.caixaService = caixaService;
     }
 
     public ContaReceber registrarFiado(Long empresaId, ContaReceberDTO dto) {
@@ -65,7 +68,10 @@ public class FiadoService {
     public ContaReceber marcarComoPago(Long id, Long empresaId) {
         ContaReceber conta = buscarContaDaEmpresa(id, empresaId);
         conta.setStatus(StatusConta.PAGO);
-        return contaRepository.save(conta);
+        ContaReceber contaSalva = contaRepository.save(conta);
+        caixaService.registrarEntrada(conta.getEmpresa(), OrigemCaixa.RECEBIMENTO_FIADO, conta.getValor(),
+                "Fiado recebido: " + conta.getNomeCliente());
+        return contaSalva;
     }
 
     public ContaReceber adiarCobranca(Long id, int diasParaAdiar, Long empresaId) {
@@ -129,6 +135,8 @@ public class FiadoService {
             }
             conta.setStatus(StatusConta.PAGO);
             contaRepository.save(conta);
+            caixaService.registrarEntrada(conta.getEmpresa(), OrigemCaixa.RECEBIMENTO_FIADO, conta.getValor(),
+                    "Fiado recebido via PIX: " + conta.getNomeCliente());
             logger.info("Webhook Delfinance: fiado #{} marcado como pago automaticamente (correlationId={}).", conta.getId(), correlationId);
         }, () -> logger.warn("Webhook Delfinance: nenhum fiado encontrado para correlationId={}", correlationId));
     }

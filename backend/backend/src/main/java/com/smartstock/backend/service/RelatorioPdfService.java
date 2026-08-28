@@ -14,6 +14,7 @@ import com.smartstock.backend.model.TipoMovimentacao;
 import com.smartstock.backend.repository.DespesaRepository;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.MovimentacaoRepository;
+import com.smartstock.backend.repository.MovimentoCaixaRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -39,13 +40,16 @@ public class RelatorioPdfService {
     private final MovimentacaoRepository movimentacaoRepository;
     private final EmpresaRepository empresaRepository;
     private final DespesaRepository despesaRepository;
+    private final MovimentoCaixaRepository movimentoCaixaRepository;
 
     public RelatorioPdfService(ProdutoRepository produtoRepository, MovimentacaoRepository movimentacaoRepository,
-                                EmpresaRepository empresaRepository, DespesaRepository despesaRepository) {
+                                EmpresaRepository empresaRepository, DespesaRepository despesaRepository,
+                                MovimentoCaixaRepository movimentoCaixaRepository) {
         this.produtoRepository = produtoRepository;
         this.movimentacaoRepository = movimentacaoRepository;
         this.empresaRepository = empresaRepository;
         this.despesaRepository = despesaRepository;
+        this.movimentoCaixaRepository = movimentoCaixaRepository;
     }
 
     private Empresa getEmpresaLogada() {
@@ -498,6 +502,127 @@ public class RelatorioPdfService {
         celulaValor.setPaddingTop(4);
         celulaValor.setPaddingBottom(4);
         table.addCell(celulaValor);
+    }
+
+    /**
+     * DFC simplificada: saldo inicial, entradas e saídas do período
+     * agrupadas por origem, e saldo final. Diferente do modelo contábil
+     * clássico (que separa Operacional/Investimento/Financiamento em
+     * blocos formais), aqui cada origem já indica a natureza — Venda PDV e
+     * Recebimento de Fiado são essencialmente operacionais, Aporte/Retirada
+     * de Sócio são financiamento.
+     */
+    public byte[] gerarRelatorioFluxoCaixaPdf(String dataInicio, String dataFim) {
+        Empresa empresa = getEmpresaLogada();
+        LocalDateTime[] limites = validarEParsearDatas(dataInicio, dataFim);
+        LocalDateTime dataInicioEfetiva = limites != null ? limites[0] : LocalDateTime.of(2000, 1, 1, 0, 0);
+        LocalDateTime dataFimEfetiva = limites != null ? limites[1] : LocalDateTime.now();
+
+        BigDecimal saldoInicial = movimentoCaixaRepository.calcularSaldoAntesDe(empresa.getId(), dataInicioEfetiva);
+        List<Object[]> linhas = movimentoCaixaRepository.somarPorTipoEOrigemNoIntervalo(empresa.getId(), dataInicioEfetiva, dataFimEfetiva);
+
+        BigDecimal totalEntradas = BigDecimal.ZERO;
+        BigDecimal totalSaidas = BigDecimal.ZERO;
+        java.util.Map<String, BigDecimal> entradasPorOrigem = new java.util.LinkedHashMap<>();
+        java.util.Map<String, BigDecimal> saidasPorOrigem = new java.util.LinkedHashMap<>();
+
+        for (Object[] linha : linhas) {
+            String tipo = linha[0].toString();
+            String origem = formatarOrigemCaixa(linha[1].toString());
+            BigDecimal valor = (BigDecimal) linha[2];
+
+            if ("ENTRADA".equals(tipo)) {
+                totalEntradas = totalEntradas.add(valor);
+                entradasPorOrigem.merge(origem, valor, BigDecimal::add);
+            } else {
+                totalSaidas = totalSaidas.add(valor);
+                saidasPorOrigem.merge(origem, valor, BigDecimal::add);
+            }
+        }
+
+        BigDecimal saldoFinal = saldoInicial.add(totalEntradas).subtract(totalSaidas);
+
+        Document document = new Document(PageSize.A4);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        try {
+            PdfWriter.getInstance(document, out);
+            document.open();
+
+            Font fontTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
+            Paragraph titulo = new Paragraph("Demonstração de Fluxo de Caixa (DFC Simplificada) - " + empresa.getNomeFantasia().toUpperCase(), fontTitulo);
+            titulo.setAlignment(Element.ALIGN_CENTER);
+            document.add(titulo);
+
+            String dataHora = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"));
+            String textoPeriodo = (limites != null)
+                    ? dataInicioEfetiva.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + " a " + dataFimEfetiva.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                    : "Todo o histórico";
+            Paragraph subtitulo = new Paragraph("Período: " + textoPeriodo + "\nGerado em: " + dataHora + "\n\n");
+            subtitulo.setAlignment(Element.ALIGN_CENTER);
+            document.add(subtitulo);
+
+            Font fontLinha = FontFactory.getFont(FontFactory.HELVETICA, 11);
+            Font fontLinhaNegrito = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11);
+            Font fontResultado = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 13);
+            Font fontSecao = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12);
+
+            PdfPTable table = new PdfPTable(2);
+            table.setWidthPercentage(100);
+            table.setWidths(new float[]{3f, 1.4f});
+            table.setSpacingBefore(10);
+
+            adicionarLinhaDre(table, "Saldo Inicial do Período", saldoInicial, fontLinhaNegrito, false);
+
+            PdfPCell secaoEntradas = new PdfPCell(new Phrase("Entradas", fontSecao));
+            secaoEntradas.setColspan(2);
+            secaoEntradas.setBorder(Rectangle.NO_BORDER);
+            secaoEntradas.setPaddingTop(10);
+            table.addCell(secaoEntradas);
+            for (var entry : entradasPorOrigem.entrySet()) {
+                adicionarLinhaDre(table, "   " + entry.getKey(), entry.getValue(), fontLinha, false);
+            }
+            adicionarLinhaDre(table, "(=) Total de Entradas", totalEntradas, fontLinhaNegrito, true);
+
+            PdfPCell secaoSaidas = new PdfPCell(new Phrase("Saídas", fontSecao));
+            secaoSaidas.setColspan(2);
+            secaoSaidas.setBorder(Rectangle.NO_BORDER);
+            secaoSaidas.setPaddingTop(10);
+            table.addCell(secaoSaidas);
+            for (var entry : saidasPorOrigem.entrySet()) {
+                adicionarLinhaDre(table, "   " + entry.getKey(), entry.getValue().negate(), fontLinha, false);
+            }
+            adicionarLinhaDre(table, "(=) Total de Saídas", totalSaidas.negate(), fontLinhaNegrito, true);
+
+            adicionarLinhaDre(table, "(=) Saldo Final do Período", saldoFinal, fontResultado, true);
+
+            document.add(table);
+
+            Font fontAviso = FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 8);
+            Paragraph aviso = new Paragraph(
+                    "\n\nEsta DFC é derivada do livro-caixa do sistema (vendas não-fiado, recebimentos de fiado, " +
+                    "pagamentos de despesa e lançamentos manuais de aporte/retirada de sócio). Ela não segue " +
+                    "formalmente a separação contábil em atividades Operacionais/Investimento/Financiamento — " +
+                    "para a DFC oficial, consulte o contador responsável.",
+                    fontAviso);
+            document.add(aviso);
+
+            document.close();
+        } catch (DocumentException e) {
+            e.printStackTrace();
+        }
+        return out.toByteArray();
+    }
+
+    private String formatarOrigemCaixa(String origemEnum) {
+        return switch (origemEnum) {
+            case "VENDA_PDV" -> "Vendas (à vista/cartão/PIX)";
+            case "RECEBIMENTO_FIADO" -> "Recebimento de Fiado";
+            case "PAGAMENTO_DESPESA" -> "Pagamento de Despesas";
+            case "APORTE_SOCIO" -> "Aporte de Sócio";
+            case "RETIRADA_SOCIO" -> "Retirada de Sócio";
+            default -> "Outro";
+        };
     }
 
     public byte[] gerarRelatorioPerdasPdf(String dataInicio, String dataFim) {

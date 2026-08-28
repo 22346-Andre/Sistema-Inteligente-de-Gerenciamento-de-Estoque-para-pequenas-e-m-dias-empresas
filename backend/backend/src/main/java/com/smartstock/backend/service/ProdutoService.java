@@ -38,6 +38,9 @@ public class ProdutoService {
     @Autowired
     private MovimentacaoRepository movimentacaoRepository;
 
+    @Autowired
+    private CaixaService caixaService;
+
     private Long getEmpresaIdLogada() {
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         Long empresaId = jwt.getClaim("empresaId");
@@ -400,7 +403,24 @@ public class ProdutoService {
         mov.setChaveNotaFiscal(chaveNotaFiscal);
         mov.setFormaPagamento(formaPagamento); // 
 
-        return movimentacaoRepository.save(mov);
+        Movimentacao movimentacaoSalva = movimentacaoRepository.save(mov);
+
+        // Lançamento automático no Caixa: só quando é uma venda de verdade
+        // (SAIDA, não devolução/quebra/ajuste) E o pagamento foi à vista —
+        // FIADO não gera entrada agora, o dinheiro só entra quando o cliente
+        // pagar de fato (ver FiadoService.marcarComoPago/marcarComoPagoPorCorrelationId).
+        if (tipoFinal == TipoMovimentacao.SAIDA && formaPagamento != null && formaPagamento != FormaPagamento.FIADO) {
+            BigDecimal precoVendaEfetivo = produtoAtualizado.getPrecoVenda() != null && produtoAtualizado.getPrecoVenda().compareTo(BigDecimal.ZERO) > 0
+                    ? produtoAtualizado.getPrecoVenda()
+                    : produtoAtualizado.getPrecoCusto();
+            if (precoVendaEfetivo != null) {
+                BigDecimal valorVenda = precoVendaEfetivo.multiply(BigDecimal.valueOf(quantidadeDesejada));
+                caixaService.registrarEntrada(produtoAtualizado.getEmpresa(), OrigemCaixa.VENDA_PDV, valorVenda,
+                        "Venda: " + produtoAtualizado.getNome() + " (" + formaPagamento + ")");
+            }
+        }
+
+        return movimentacaoSalva;
     }
 
     @jakarta.transaction.Transactional

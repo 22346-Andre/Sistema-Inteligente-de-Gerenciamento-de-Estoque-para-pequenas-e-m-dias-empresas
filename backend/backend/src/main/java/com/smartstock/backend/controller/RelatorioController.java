@@ -76,6 +76,19 @@ public class RelatorioController {
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
 
+    @GetMapping("/fluxo-caixa/pdf")
+    public ResponseEntity<byte[]> descarregarFluxoCaixaPdf(
+            @RequestParam(required = false) String dataInicio,
+            @RequestParam(required = false) String dataFim) {
+        byte[] pdfBytes = relatorioPdfService.gerarRelatorioFluxoCaixaPdf(dataInicio, dataFim);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "fluxo_caixa_smartstock.pdf");
+
+        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+    }
+
     @GetMapping("/perdas/pdf")
     public ResponseEntity<byte[]> descarregarPerdasPdf(
             @RequestParam(required = false) String dataInicio,

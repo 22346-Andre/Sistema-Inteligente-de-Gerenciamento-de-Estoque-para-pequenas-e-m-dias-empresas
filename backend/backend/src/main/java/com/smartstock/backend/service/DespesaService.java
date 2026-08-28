@@ -6,6 +6,7 @@ import com.smartstock.backend.exception.RecursoNaoEncontradoException;
 import com.smartstock.backend.model.Despesa;
 import com.smartstock.backend.model.Empresa;
 import com.smartstock.backend.model.Fornecedor;
+import com.smartstock.backend.model.OrigemCaixa;
 import com.smartstock.backend.model.StatusConta;
 import com.smartstock.backend.repository.DespesaRepository;
 import com.smartstock.backend.repository.EmpresaRepository;
@@ -21,12 +22,14 @@ public class DespesaService {
     private final DespesaRepository despesaRepository;
     private final EmpresaRepository empresaRepository;
     private final FornecedorRepository fornecedorRepository;
+    private final CaixaService caixaService;
 
     public DespesaService(DespesaRepository despesaRepository, EmpresaRepository empresaRepository,
-                           FornecedorRepository fornecedorRepository) {
+                           FornecedorRepository fornecedorRepository, CaixaService caixaService) {
         this.despesaRepository = despesaRepository;
         this.empresaRepository = empresaRepository;
         this.fornecedorRepository = fornecedorRepository;
+        this.caixaService = caixaService;
     }
 
     public Despesa registrar(Long empresaId, DespesaDTO dto) {
@@ -65,7 +68,10 @@ public class DespesaService {
         Despesa despesa = buscarDaEmpresa(id, empresaId);
         despesa.setStatus(StatusConta.PAGO);
         despesa.setDataPagamento(LocalDate.now());
-        return despesaRepository.save(despesa);
+        Despesa despesaSalva = despesaRepository.save(despesa);
+        caixaService.registrarSaida(despesa.getEmpresa(), OrigemCaixa.PAGAMENTO_DESPESA, despesa.getValor(),
+                "Despesa paga: " + despesa.getDescricao());
+        return despesaSalva;
     }
 
     public Despesa atualizar(Long id, DespesaDTO dto, Long empresaId) {
