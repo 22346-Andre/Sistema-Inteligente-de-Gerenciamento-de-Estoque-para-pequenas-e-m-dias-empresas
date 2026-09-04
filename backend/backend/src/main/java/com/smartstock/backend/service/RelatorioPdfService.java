@@ -624,6 +624,7 @@ public class RelatorioPdfService {
             case "PAGAMENTO_DESPESA" -> "Pagamento de Despesas";
             case "APORTE_SOCIO" -> "Aporte de Sócio";
             case "RETIRADA_SOCIO" -> "Retirada de Sócio";
+            case "COMPRA_MERCADORIA" -> "Compra de Mercadoria";
             default -> "Outro";
         };
     }

@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -40,6 +41,9 @@ public class ProdutoService {
 
     @Autowired
     private CaixaService caixaService;
+
+    @Autowired
+    private DespesaRepository despesaRepository;
 
     private Long getEmpresaIdLogada() {
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -446,6 +450,11 @@ public class ProdutoService {
 
             BigDecimal custoMedio = somaValores.divide(new BigDecimal(totalItens), 2, RoundingMode.HALF_UP);
             produto.setPrecoCusto(custoMedio);
+
+            // Efeito financeiro da compra — só existe valor pra lançar quando
+            // um preço de compra de verdade foi informado (senão seria um
+            // ajuste de estoque sem custo, tipo doação/correção de contagem).
+            registrarEfeitoFinanceiroDaCompra(produto, dto, novaQuantidade, valorNovaCompra);
         }
 
         Lote novoLote = new Lote();
@@ -477,5 +486,37 @@ public class ProdutoService {
         movimentacaoRepository.save(mov);
 
         return produtoAtualizado;
+    }
+
+    // Compra à vista -> baixa direto do Caixa agora. Compra a prazo -> vira
+    // uma Despesa PENDENTE (Contas a Pagar), que só bate no Caixa quando for
+    // marcada como paga (DespesaService.marcarComoPaga), do mesmo jeito que
+    // qualquer outra despesa.
+    private void registrarEfeitoFinanceiroDaCompra(Produto produto, LoteDTO dto, int quantidade, BigDecimal valorTotalCompra) {
+        boolean pagamentoImediato = dto.getPagamentoImediato() != null && dto.getPagamentoImediato();
+
+        if (pagamentoImediato) {
+            caixaService.registrarSaida(produto.getEmpresa(), OrigemCaixa.COMPRA_MERCADORIA, valorTotalCompra,
+                    "Compra: " + produto.getNome() + " (" + quantidade + " un.)");
+            return;
+        }
+
+        Despesa despesa = new Despesa();
+        despesa.setEmpresa(produto.getEmpresa());
+        despesa.setDescricao("Compra de mercadoria: " + produto.getNome() + " (" + quantidade + " un.)");
+        despesa.setCategoria(dto.getCategoria() != null && !dto.getCategoria().isBlank() ? dto.getCategoria() : "FORNECEDOR");
+        despesa.setValor(valorTotalCompra);
+        despesa.setDataVencimento(dto.getDataVencimento() != null ? dto.getDataVencimento() : LocalDate.now().plusDays(30));
+        despesa.setStatus(StatusConta.PENDENTE);
+
+        Long fornecedorId = dto.getFornecedorId() != null ? dto.getFornecedorId()
+                : (produto.getFornecedor() != null ? produto.getFornecedor().getId() : null);
+        if (fornecedorId != null) {
+            Fornecedor fornecedor = fornecedorRepository.findById(fornecedorId)
+                    .orElseThrow(() -> new RecursoNaoEncontradoException("Fornecedor não encontrado: id=" + fornecedorId));
+            despesa.setFornecedor(fornecedor);
+        }
+
+        despesaRepository.save(despesa);
     }
 }

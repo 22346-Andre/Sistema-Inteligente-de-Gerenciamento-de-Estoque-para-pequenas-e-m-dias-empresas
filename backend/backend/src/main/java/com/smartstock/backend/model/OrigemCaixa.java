@@ -11,5 +11,6 @@ public enum OrigemCaixa {
     PAGAMENTO_DESPESA,  // SAIDA   — uma despesa foi marcada como paga
     APORTE_SOCIO,       // ENTRADA — sócio colocou dinheiro na empresa (lançamento manual)
     RETIRADA_SOCIO,     // SAIDA   — sócio retirou dinheiro da empresa (lançamento manual)
+    COMPRA_MERCADORIA,  // SAIDA   — entrada de estoque paga à vista (ver ProdutoService.adicionarLote)
     OUTRO               // lançamento manual avulso, sem categoria melhor
 }

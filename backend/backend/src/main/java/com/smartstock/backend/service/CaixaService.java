@@ -26,8 +26,10 @@ public class CaixaService {
 
     // ==== Chamados por outros services quando o dinheiro de fato se move ====
     // Não expostos como endpoint — são acionados de dentro de
-    // MovimentacaoService/ProdutoService (venda), FiadoService (fiado pago)
-    // e DespesaService (despesa paga). Ver os pontos de chamada em cada um.
+    // ProdutoService (venda; e compra de mercadoria à vista via adicionarLote),
+    // FiadoService (fiado pago) e DespesaService (despesa paga, incluindo
+    // compra de mercadoria a prazo, ver ProdutoService.registrarEfeitoFinanceiroDaCompra).
+    // Ver os pontos de chamada em cada um.
 
     public void registrarEntrada(Empresa empresa, OrigemCaixa origem, BigDecimal valor, String descricao) {
         registrar(empresa, TipoMovimentoCaixa.ENTRADA, origem, valor, descricao);
