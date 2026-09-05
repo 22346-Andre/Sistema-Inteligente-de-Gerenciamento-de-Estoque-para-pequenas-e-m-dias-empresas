@@ -40,4 +40,15 @@ public class Movimentacao {
     @Enumerated(EnumType.STRING)
     @Column(name = "forma_pagamento", length = 20)
     private FormaPagamento formaPagamento;
+
+    // 🆕 Rastreabilidade: quem fez essa movimentação e (via dataMovimentacao,
+    // que já existia) a que horas. Guardado como snapshot (id + nome), não
+    // como @ManyToOne pro Usuario, porque usuário pode ser excluído depois —
+    // o histórico não pode quebrar nem virar "usuário null" quando isso
+    // acontecer.
+    @Column(name = "usuario_id")
+    private Long usuarioId;
+
+    @Column(name = "usuario_nome", length = 150)
+    private String usuarioNome;
 }

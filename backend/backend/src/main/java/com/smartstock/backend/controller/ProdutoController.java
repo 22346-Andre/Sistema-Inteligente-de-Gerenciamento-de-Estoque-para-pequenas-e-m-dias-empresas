@@ -48,6 +48,21 @@ public class ProdutoController {
         return ResponseEntity.ok(produto);
     }
 
+    // 🆕 Lotes com saldo de um produto (validade, quantidade, custo da compra),
+    // ordenados por quem vence primeiro — mesma ordem usada na baixa por FEFO.
+    @GetMapping("/{id}/lotes")
+    public ResponseEntity<List<com.smartstock.backend.model.Lote>> listarLotes(@PathVariable Long id) {
+        return ResponseEntity.ok(service.listarLotes(id));
+    }
+
+    // 🆕 Alertas de vencimento pra empresa toda. ?dias=30 por padrão (lotes
+    // que vencem nos próximos 30 dias, contando a partir de hoje).
+    @GetMapping("/alertas-vencimento")
+    public ResponseEntity<List<com.smartstock.backend.dto.LoteAlertaDTO>> listarAlertasVencimento(
+            @RequestParam(defaultValue = "30") int dias) {
+        return ResponseEntity.ok(service.listarAlertasVencimento(dias));
+    }
+
     @GetMapping("/busca-avancada")
     public ResponseEntity<List<Produto>> buscarProdutosAvancado(
             @RequestParam(required = false) String categoria,

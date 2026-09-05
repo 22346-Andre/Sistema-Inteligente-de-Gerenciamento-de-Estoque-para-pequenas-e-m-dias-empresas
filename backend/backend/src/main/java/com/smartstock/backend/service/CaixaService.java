@@ -8,6 +8,8 @@ import com.smartstock.backend.model.OrigemCaixa;
 import com.smartstock.backend.model.TipoMovimentoCaixa;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.MovimentoCaixaRepository;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -53,7 +55,36 @@ public class CaixaService {
         movimento.setOrigem(origem);
         movimento.setValor(valor);
         movimento.setDescricao(descricao);
+        movimento.setUsuarioId(getUsuarioIdLogado());
+        movimento.setUsuarioNome(getUsuarioNomeLogado());
         movimentoCaixaRepository.save(movimento);
+    }
+
+    // 🆕 Quem está logado agora. Defensivo de propósito: registrar() também é
+    // chamado por FiadoService.marcarComoPagoPorCorrelationId, que roda a
+    // partir de um webhook de pagamento (rota pública, sem usuário logado) —
+    // nesse caso o lançamento simplesmente fica sem usuário atribuído, em vez
+    // de derrubar o webhook inteiro.
+    private Long getUsuarioIdLogado() {
+        try {
+            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            if (principal instanceof Jwt jwt) {
+                return jwt.getClaim("id");
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    private String getUsuarioNomeLogado() {
+        try {
+            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            if (principal instanceof Jwt jwt) {
+                return jwt.getClaim("nome");
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     // ==== Uso direto pela tela de Caixa ====
@@ -90,6 +121,8 @@ public class CaixaService {
         movimento.setOrigem(dto.getOrigem());
         movimento.setValor(dto.getValor());
         movimento.setDescricao(dto.getDescricao());
+        movimento.setUsuarioId(getUsuarioIdLogado());
+        movimento.setUsuarioNome(getUsuarioNomeLogado());
         return movimentoCaixaRepository.save(movimento);
     }
 }

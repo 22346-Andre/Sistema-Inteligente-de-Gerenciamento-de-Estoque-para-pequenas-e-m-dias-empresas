@@ -37,6 +37,18 @@ public class MovimentacaoService {
         return empresaId;
     }
 
+    // 🆕 Quem está logado agora — pra carimbar em cada Movimentacao quem fez
+    // (a que horas já vem de graça, é a dataMovimentacao).
+    private Long getUsuarioIdLogado() {
+        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return jwt.getClaim("id");
+    }
+
+    private String getUsuarioNomeLogado() {
+        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return jwt.getClaim("nome");
+    }
+
     public List<Movimentacao> listarTodas() {
         // Retorna só o histórico da empresa logada para montar o Dashboard!
         return movimentacaoRepository.findByEmpresaIdOrderByDataMovimentacaoDesc(getEmpresaIdLogada());
@@ -85,6 +97,8 @@ public class MovimentacaoService {
         mov.setTipo(tipo);
         mov.setQuantidade(dto.getQuantidade());
         mov.setDataMovimentacao(java.time.LocalDateTime.now());
+        mov.setUsuarioId(getUsuarioIdLogado());
+        mov.setUsuarioNome(getUsuarioNomeLogado());
 
         return movimentacaoRepository.save(mov);
     }

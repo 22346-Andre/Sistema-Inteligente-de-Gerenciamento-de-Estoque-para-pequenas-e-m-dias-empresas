@@ -3,6 +3,7 @@ package com.smartstock.backend.service;
 import com.smartstock.backend.exception.AcessoNegadoException;
 import com.smartstock.backend.exception.RecursoNaoEncontradoException;
 
+import com.smartstock.backend.dto.LoteAlertaDTO;
 import com.smartstock.backend.dto.LoteDTO;
 import com.smartstock.backend.dto.ProdutoDTO;
 import com.smartstock.backend.model.*;
@@ -53,6 +54,18 @@ public class ProdutoService {
             throw new RecursoNaoEncontradoException("Erro: O usuário logado não possui vínculo com nenhuma empresa.");
         }
         return empresaId;
+    }
+
+    // 🆕 Quem está logado agora — pra carimbar em cada Movimentacao/venda quem
+    // fez (a que horas já vem de graça, é a dataMovimentacao).
+    private Long getUsuarioIdLogado() {
+        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return jwt.getClaim("id");
+    }
+
+    private String getUsuarioNomeLogado() {
+        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return jwt.getClaim("nome");
     }
 
 
@@ -145,6 +158,37 @@ public class ProdutoService {
         return repository.findProdutosComEstoqueBaixoPorEmpresa(getEmpresaIdLogada());
     }
 
+    // 🆕 Lotes com saldo de um produto, ordenados por quem vence primeiro
+    // (mesma ordem usada na baixa por FEFO). Antes só existia o POST pra
+    // criar lote — nunca um jeito de ler os lotes de volta.
+    @jakarta.transaction.Transactional
+    public List<Lote> listarLotes(Long produtoId) {
+        Produto produto = repository.findById(produtoId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Produto não encontrado com o ID: " + produtoId));
+
+        if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
+            throw new AcessoNegadoException("Acesso negado: Este produto pertence a outra empresa.");
+        }
+
+        return loteRepository.findLotesDisponiveisParaBaixa(produtoId);
+    }
+
+    // 🆕 Alertas de vencimento pra empresa toda. Liga o
+    // LoteRepository.findLotesPertoDoVencimento, que já existia mas nunca
+    // tinha sido chamado por nenhum Service/Controller.
+    public List<LoteAlertaDTO> listarAlertasVencimento(int diasAntecedencia) {
+        java.time.LocalDate dataLimite = java.time.LocalDate.now().plusDays(diasAntecedencia);
+        List<Lote> lotes = loteRepository.findLotesPertoDoVencimento(getEmpresaIdLogada(), dataLimite);
+        return lotes.stream()
+                .map(l -> new LoteAlertaDTO(
+                        l.getProduto().getId(),
+                        l.getProduto().getNome(),
+                        l.getNumeroLote(),
+                        l.getQuantidade(),
+                        l.getDataValidade()))
+                .toList();
+    }
+
     @jakarta.transaction.Transactional
     public Produto salvar(ProdutoDTO dto) {
         Long empresaIdLogada = getEmpresaIdLogada();
@@ -204,6 +248,8 @@ public class ProdutoService {
             // entidade) — garante que as consultas por dataMovimentacao
             // (Curva ABC, Giro de Estoque) enxerguem essa movimentação.
             movInicial.setDataMovimentacao(java.time.LocalDateTime.now());
+            movInicial.setUsuarioId(getUsuarioIdLogado());
+            movInicial.setUsuarioNome(getUsuarioNomeLogado());
 
             movimentacaoRepository.save(movInicial);
         }
@@ -280,6 +326,8 @@ public class ProdutoService {
             }
             // Setado explicitamente — mesmo motivo do comentário acima.
             ajuste.setDataMovimentacao(java.time.LocalDateTime.now());
+            ajuste.setUsuarioId(getUsuarioIdLogado());
+            ajuste.setUsuarioNome(getUsuarioNomeLogado());
 
             movimentacaoRepository.save(ajuste);
         }
@@ -403,6 +451,8 @@ public class ProdutoService {
         // dias"; depender só do valor padrão do campo na entidade deixa essa
         // consulta cega a qualquer atraso entre construir e persistir o objeto.
         mov.setDataMovimentacao(java.time.LocalDateTime.now());
+        mov.setUsuarioId(getUsuarioIdLogado());
+        mov.setUsuarioNome(getUsuarioNomeLogado());
 
         mov.setChaveNotaFiscal(chaveNotaFiscal);
         mov.setFormaPagamento(formaPagamento); // 
@@ -476,6 +526,8 @@ public class ProdutoService {
         mov.setQuantidade(novaQuantidade);
         mov.setEmpresa(produtoAtualizado.getEmpresa());
         mov.setDataMovimentacao(java.time.LocalDateTime.now());
+        mov.setUsuarioId(getUsuarioIdLogado());
+        mov.setUsuarioNome(getUsuarioNomeLogado());
 
         String obs = "[CFOP " + cfopOperacao + "] Entrada de lote";
         if (dto.getNumeroLote() != null && !dto.getNumeroLote().isEmpty()) {

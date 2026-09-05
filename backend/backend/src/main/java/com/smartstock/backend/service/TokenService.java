@@ -37,6 +37,7 @@ public class TokenService {
                 .expiresAt(now.plusSeconds(expiry))
                 .subject(usuario.getEmail())
                 .claim("id", usuario.getId())
+                .claim("nome", usuario.getNome())
                 .claim("perfil", usuario.getPerfil())
                 // O carimbo da empresa no token
                 .claim("empresaId", usuario.getEmpresa() != null ? usuario.getEmpresa().getId() : null)

@@ -33,7 +33,7 @@ public class VerificadorEstoqueService {
     @Scheduled(cron = "0 0 8 * * *", zone = "America/Sao_Paulo")
     @SchedulerLock(name = "relatorioDiarioInteligente", lockAtMostFor = "PT30M", lockAtLeastFor = "PT1M")
     public void relatorioDiarioInteligente() {
-        System.out.println("🤖 [IA SmartStock] Iniciando varredura de inteligência de estoque...");
+        System.out.println("🤖 [IA EstoqueMax] Iniciando varredura de inteligência de estoque...");
 
         List<Empresa> empresas = empresaRepository.findAll();
 
@@ -58,7 +58,7 @@ public class VerificadorEstoqueService {
     private void enviarResumoDiario(Empresa empresa, List<Produto> criticos, List<Lote> vencendo, List<Produto> encalhados) {
         StringBuilder conteudo = new StringBuilder();
         conteudo.append("Olá, gestor da ").append(empresa.getNomeFantasia()).append("!\n");
-        conteudo.append("Aqui é o seu assistente SmartStock. Preparei o seu resumo diário de estoque:\n\n");
+        conteudo.append("Aqui é o seu assistente EstoqueMax. Preparei o seu resumo diário de estoque:\n\n");
 
         // --- BLOCO 1: COMPRAR ---
         if (!criticos.isEmpty()) {
@@ -100,7 +100,7 @@ public class VerificadorEstoqueService {
 
             emailService.enviarResumoComPlanilha(
                     emailDestino,
-                    "📊 Resumo Inteligente SmartStock - " + empresa.getNomeFantasia(),
+                    "📊 Resumo Inteligente EstoqueMax - " + empresa.getNomeFantasia(),
                     conteudo.toString(),
                     empresa.getId()
             );

@@ -48,4 +48,12 @@ public class MovimentoCaixa {
 
     @Column(name = "data_movimento", nullable = false)
     private LocalDateTime dataMovimento = LocalDateTime.now();
+
+    // 🆕 Rastreabilidade: mesmo raciocínio de Movimentacao.usuarioId/usuarioNome
+    // — snapshot, não @ManyToOne, pra não quebrar se o usuário for excluído.
+    @Column(name = "usuario_id")
+    private Long usuarioId;
+
+    @Column(name = "usuario_nome", length = 150)
+    private String usuarioNome;
 }
