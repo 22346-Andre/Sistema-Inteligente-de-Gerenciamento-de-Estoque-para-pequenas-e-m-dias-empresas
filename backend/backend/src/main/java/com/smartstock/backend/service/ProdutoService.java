@@ -252,6 +252,16 @@ public class ProdutoService {
             movInicial.setUsuarioNome(getUsuarioNomeLogado());
 
             movimentacaoRepository.save(movInicial);
+
+            // 🆕 Cadastro manual também gera um Lote de verdade (antes só a
+            // Movimentacao era criada, e a aba "Lotes e Validade" ficava vazia
+            // pra produto cadastrado na mão). Sem validade informada = NULL,
+            // mesma regra do CSV/NFe.
+            Lote loteInicial = new Lote();
+            loteInicial.setProduto(produtoSalvo);
+            loteInicial.setQuantidade(quantidadeInicial);
+            loteInicial.setDataValidade(dto.getDataValidade());
+            loteRepository.save(loteInicial);
         }
 
         return produtoSalvo;
@@ -371,8 +381,17 @@ public class ProdutoService {
         return repository.findAll(spec);
     }
 
+    @Autowired
+    private SessaoCaixaService sessaoCaixaService;
+
     @jakarta.transaction.Transactional
     public Movimentacao registrarSaida(Long produtoId, Integer quantidadeDesejada, TipoMovimentacao tipo, String motivo, String chaveNotaFiscal, FormaPagamento formaPagamento) { // 🟢 Adicionamos o 6º parâmetro aqui
+        // 🆕 Só bloqueia quem vende pelo PDV autenticado (este método). O
+        // webhook (registrarSaidaComEmpresa, abaixo) roda sem operador/sessão
+        // nenhuma — venda por integração não tem "caixa" físico associado.
+        if (sessaoCaixaService.buscarSessaoAtual() == null) {
+            throw new IllegalStateException("Abra o caixa antes de registrar vendas ou perdas.");
+        }
         return registrarSaidaInterno(produtoId, quantidadeDesejada, tipo, motivo, chaveNotaFiscal, formaPagamento, getEmpresaIdLogada());
     }
 
@@ -470,7 +489,7 @@ public class ProdutoService {
             if (precoVendaEfetivo != null) {
                 BigDecimal valorVenda = precoVendaEfetivo.multiply(BigDecimal.valueOf(quantidadeDesejada));
                 caixaService.registrarEntrada(produtoAtualizado.getEmpresa(), OrigemCaixa.VENDA_PDV, valorVenda,
-                        "Venda: " + produtoAtualizado.getNome() + " (" + formaPagamento + ")");
+                        "Venda: " + produtoAtualizado.getNome() + " (" + formaPagamento + ")", formaPagamento);
             }
         }
 

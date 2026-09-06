@@ -56,4 +56,12 @@ public class MovimentoCaixa {
 
     @Column(name = "usuario_nome", length = 150)
     private String usuarioNome;
+
+    // 🆕 Só preenchido quando origem = VENDA_PDV. Sem isso, não dava pra saber
+    // quanto da venda foi em dinheiro de verdade (pra conferência de gaveta
+    // no fechamento de caixa) — cartão e PIX entram aqui também como
+    // "Disponibilidades" da empresa, mas não ficam na gaveta física.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "forma_pagamento", length = 20)
+    private FormaPagamento formaPagamento;
 }

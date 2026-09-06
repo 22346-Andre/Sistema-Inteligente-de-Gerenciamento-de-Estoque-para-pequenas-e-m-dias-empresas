@@ -187,7 +187,7 @@ public class ImportacaoService {
                 relatorio.totalAtualizados++;
 
                 if (quantidadeLida > 0) {
-                    criarLoteInicial(pSalvo, quantidadeLida);
+                    criarLoteInicial(pSalvo, quantidadeLida, pLido.getDataValidade());
                     registrarMovimentacaoImportacao(pSalvo, empresaLogada, quantidadeLida, "Entrada via importação de CSV");
                 }
 
@@ -211,7 +211,7 @@ public class ImportacaoService {
                 relatorio.nomesNovos.add(pSalvo.getNome());
 
                 if (quantidadeLida > 0) {
-                    criarLoteInicial(pSalvo, quantidadeLida);
+                    criarLoteInicial(pSalvo, quantidadeLida, pLido.getDataValidade());
                     registrarMovimentacaoImportacao(pSalvo, empresaLogada, quantidadeLida, "Estoque inicial - Importação de CSV");
                 }
             }
@@ -479,7 +479,9 @@ public class ImportacaoService {
                 pSalvo = produtoRepository.save(p);
                 relatorio.totalAtualizados++;
                 if (quantidade > 0) {
-                    criarLoteInicial(pSalvo, quantidade);
+                    // 🆕 NFe ainda não lê o grupo <rastro>/dVal (validade de lote,
+                    // usado por perecíveis) — fica sem validade por enquanto.
+                    criarLoteInicial(pSalvo, quantidade, null);
                     registrarMovimentacaoImportacao(pSalvo, empresaLogada, quantidade, "Entrada via importação de XML NFe");
                 }
 
@@ -502,7 +504,7 @@ public class ImportacaoService {
                 pSalvo = produtoRepository.save(pNovo);
                 relatorio.nomesNovos.add(pSalvo.getNome());
                 if (quantidade > 0) {
-                    criarLoteInicial(pSalvo, quantidade);
+                    criarLoteInicial(pSalvo, quantidade, null);
                     registrarMovimentacaoImportacao(pSalvo, empresaLogada, quantidade, "Estoque inicial - Importação de XML NFe");
                 }
             }
@@ -686,11 +688,14 @@ public class ImportacaoService {
         }
     }
 
-    private void criarLoteInicial(Produto produto, Integer quantidade) {
+    // 🆕 Sem validade recebida = fica NULL, não mais "hoje + 1 ano" pra tudo
+    // (parafuso de oficina não vence; feijão vence antes de arroz — o chute
+    // genérico gerava alerta de vencimento errado ou omitido).
+    private void criarLoteInicial(Produto produto, Integer quantidade, LocalDate dataValidade) {
         Lote lote = new Lote();
         lote.setProduto(produto);
         lote.setQuantidade(quantidade);
-        lote.setDataValidade(LocalDate.now().plusYears(1));
+        lote.setDataValidade(dataValidade);
         loteRepository.save(lote);
     }
 

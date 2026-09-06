@@ -1,11 +1,13 @@
 package com.smartstock.backend.dto;
 
 import com.opencsv.bean.CsvBindByName;
+import com.opencsv.bean.CsvDate;
 import com.smartstock.backend.model.Imposto;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Data
@@ -37,6 +39,13 @@ public class ProdutoDTO {
 
     @CsvBindByName(column = "quantidadeMinima")
     private Integer quantidadeMinima;
+
+    // 🆕 Validade do lote inicial (opcional). Usado tanto pelo CSV quanto pelo
+    // formulário manual de "novo produto" — se não vier, o lote fica sem
+    // validade (NULL), nunca mais um chute de "hoje + 1 ano" pra tudo.
+    @CsvBindByName(column = "dataValidade")
+    @CsvDate("yyyy-MM-dd")
+    private LocalDate dataValidade;
 
     @CsvBindByName(column = "ncm")
     private String ncm;

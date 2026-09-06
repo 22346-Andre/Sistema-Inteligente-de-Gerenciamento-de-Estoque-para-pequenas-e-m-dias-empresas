@@ -34,4 +34,14 @@ public interface MovimentoCaixaRepository extends JpaRepository<MovimentoCaixa, 
            "WHERE m.empresa.id = :empresaId AND m.dataMovimento BETWEEN :inicio AND :fim " +
            "GROUP BY m.tipo, m.origem")
     List<Object[]> somarPorTipoEOrigemNoIntervalo(@Param("empresaId") Long empresaId, @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
+
+    // 🆕 Quanto ESSE operador vendeu em ESPÉCIE (dinheiro de verdade) durante
+    // o turno — é isso que precisa bater na gaveta no fechamento, não o
+    // total de vendas (que inclui cartão/PIX, que nunca passam pela gaveta).
+    @Query("SELECT COALESCE(SUM(m.valor), 0) FROM MovimentoCaixa m " +
+           "WHERE m.empresa.id = :empresaId AND m.usuarioId = :usuarioId " +
+           "AND m.tipo = 'ENTRADA' AND m.origem = 'VENDA_PDV' AND m.formaPagamento = 'ESPECIE' " +
+           "AND m.dataMovimento BETWEEN :inicio AND :fim")
+    BigDecimal somarVendasEspecieDoOperadorNoIntervalo(@Param("empresaId") Long empresaId, @Param("usuarioId") Long usuarioId,
+                                                        @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
 }

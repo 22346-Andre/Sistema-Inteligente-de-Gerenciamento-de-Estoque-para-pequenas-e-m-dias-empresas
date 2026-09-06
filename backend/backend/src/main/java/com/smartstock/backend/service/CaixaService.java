@@ -3,6 +3,7 @@ package com.smartstock.backend.service;
 import com.smartstock.backend.dto.LancamentoCaixaDTO;
 import com.smartstock.backend.exception.RegraNegocioException;
 import com.smartstock.backend.model.Empresa;
+import com.smartstock.backend.model.FormaPagamento;
 import com.smartstock.backend.model.MovimentoCaixa;
 import com.smartstock.backend.model.OrigemCaixa;
 import com.smartstock.backend.model.TipoMovimentoCaixa;
@@ -34,14 +35,22 @@ public class CaixaService {
     // Ver os pontos de chamada em cada um.
 
     public void registrarEntrada(Empresa empresa, OrigemCaixa origem, BigDecimal valor, String descricao) {
-        registrar(empresa, TipoMovimentoCaixa.ENTRADA, origem, valor, descricao);
+        registrar(empresa, TipoMovimentoCaixa.ENTRADA, origem, valor, descricao, null);
+    }
+
+    // 🆕 Overload usado pela venda no PDV — guarda a forma de pagamento pra
+    // dar pra saber depois quanto entrou em ESPÉCIE de verdade (necessário
+    // pra conferência de gaveta no fechamento de caixa; cartão/PIX contam
+    // pro saldo da empresa mas nunca estão na gaveta física).
+    public void registrarEntrada(Empresa empresa, OrigemCaixa origem, BigDecimal valor, String descricao, FormaPagamento formaPagamento) {
+        registrar(empresa, TipoMovimentoCaixa.ENTRADA, origem, valor, descricao, formaPagamento);
     }
 
     public void registrarSaida(Empresa empresa, OrigemCaixa origem, BigDecimal valor, String descricao) {
-        registrar(empresa, TipoMovimentoCaixa.SAIDA, origem, valor, descricao);
+        registrar(empresa, TipoMovimentoCaixa.SAIDA, origem, valor, descricao, null);
     }
 
-    private void registrar(Empresa empresa, TipoMovimentoCaixa tipo, OrigemCaixa origem, BigDecimal valor, String descricao) {
+    private void registrar(Empresa empresa, TipoMovimentoCaixa tipo, OrigemCaixa origem, BigDecimal valor, String descricao, FormaPagamento formaPagamento) {
         // Valor zero/nulo não é um lançamento de caixa de verdade (ex.: venda
         // com precoVenda e precoCusto ambos nulos) — não polui o extrato com
         // uma linha de R$0,00 sem significado nenhum.
@@ -55,6 +64,7 @@ public class CaixaService {
         movimento.setOrigem(origem);
         movimento.setValor(valor);
         movimento.setDescricao(descricao);
+        movimento.setFormaPagamento(formaPagamento);
         movimento.setUsuarioId(getUsuarioIdLogado());
         movimento.setUsuarioNome(getUsuarioNomeLogado());
         movimentoCaixaRepository.save(movimento);
