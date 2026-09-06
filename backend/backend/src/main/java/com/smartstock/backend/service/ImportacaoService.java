@@ -6,14 +6,18 @@ import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
 import com.opencsv.exceptions.CsvException;
 import com.smartstock.backend.dto.ProdutoDTO;
+import com.smartstock.backend.model.Despesa;
 import com.smartstock.backend.model.Empresa;
 import com.smartstock.backend.model.Fornecedor;
 import com.smartstock.backend.model.Imposto;
 import com.smartstock.backend.model.Lote;
 import com.smartstock.backend.model.Movimentacao;
 import com.smartstock.backend.model.NotaFiscalImportada;
+import com.smartstock.backend.model.OrigemCaixa;
 import com.smartstock.backend.model.Produto;
+import com.smartstock.backend.model.StatusConta;
 import com.smartstock.backend.model.TipoMovimentacao;
+import com.smartstock.backend.repository.DespesaRepository;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.FornecedorRepository;
 import com.smartstock.backend.repository.LoteRepository;
@@ -53,19 +57,25 @@ public class ImportacaoService {
     private final FornecedorRepository fornecedorRepository;
     private final MovimentacaoRepository movimentacaoRepository;
     private final NotaFiscalImportadaRepository notaFiscalImportadaRepository;
+    private final DespesaRepository despesaRepository;
+    private final CaixaService caixaService;
 
     public ImportacaoService(ProdutoRepository produtoRepository,
                              EmpresaRepository empresaRepository,
                              LoteRepository loteRepository,
                              FornecedorRepository fornecedorRepository,
                              MovimentacaoRepository movimentacaoRepository,
-                             NotaFiscalImportadaRepository notaFiscalImportadaRepository) {
+                             NotaFiscalImportadaRepository notaFiscalImportadaRepository,
+                             DespesaRepository despesaRepository,
+                             CaixaService caixaService) {
         this.produtoRepository = produtoRepository;
         this.empresaRepository = empresaRepository;
         this.loteRepository = loteRepository;
         this.fornecedorRepository = fornecedorRepository;
         this.movimentacaoRepository = movimentacaoRepository;
         this.notaFiscalImportadaRepository = notaFiscalImportadaRepository;
+        this.despesaRepository = despesaRepository;
+        this.caixaService = caixaService;
     }
 
     private Long getEmpresaIdLogada() {
@@ -397,7 +407,7 @@ public class ImportacaoService {
 
     @SuppressWarnings("unchecked")
     @Transactional
-    public String salvarProdutosLidos(Map<String, Object> dadosLidos) {
+    public String salvarProdutosLidos(Map<String, Object> dadosLidos, Boolean pagamentoImediato, LocalDate dataVencimento) {
         Long empresaId = getEmpresaIdLogada();
         Empresa empresaLogada = empresaRepository.findById(empresaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada."));
@@ -532,6 +542,32 @@ public class ImportacaoService {
             registro.setEmpresa(empresaLogada);
             registro.setFornecedor(fornecedor);
             notaFiscalImportadaRepository.save(registro);
+        }
+
+        // 🆕 Diferente do CSV (que pode ser cadastro/migração sem compra real
+        // por trás), toda NF-e é a prova fiscal de uma compra que de fato
+        // aconteceu — então sempre gera lançamento no Caixa (à vista) ou uma
+        // Despesa a pagar (a prazo), pelo valor total da nota (campo <vNF>).
+        BigDecimal valorTotalNota = dadosNota != null ? (BigDecimal) dadosNota.get("valorTotal") : null;
+        if (valorTotalNota != null && valorTotalNota.compareTo(BigDecimal.ZERO) > 0) {
+            String numeroNota = dadosNota.get("numeroNota") != null ? (String) dadosNota.get("numeroNota") : "";
+            String descricaoCompra = "Compra: NF-e " + numeroNota
+                    + (fornecedor != null ? " (" + fornecedor.getNome() + ")" : "");
+
+            boolean pago = pagamentoImediato != null && pagamentoImediato;
+            if (pago) {
+                caixaService.registrarSaida(empresaLogada, OrigemCaixa.COMPRA_MERCADORIA, valorTotalNota, descricaoCompra);
+            } else {
+                Despesa despesa = new Despesa();
+                despesa.setEmpresa(empresaLogada);
+                despesa.setDescricao(descricaoCompra);
+                despesa.setCategoria("FORNECEDOR");
+                despesa.setValor(valorTotalNota);
+                despesa.setDataVencimento(dataVencimento != null ? dataVencimento : LocalDate.now().plusDays(30));
+                despesa.setStatus(StatusConta.PENDENTE);
+                despesa.setFornecedor(fornecedor);
+                despesaRepository.save(despesa);
+            }
         }
 
         return relatorio.montarMensagem("XML NFe");

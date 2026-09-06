@@ -49,7 +49,12 @@ public class ImportacaoController {
     @PostMapping(value = "/xml-direto", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> importarXmlDireto(
             @RequestParam(value = "ficheiro", required = false) MultipartFile ficheiro,
-            @RequestParam(value = "file", required = false) MultipartFile file) {
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            // 🆕 Toda NF-e é uma compra de verdade — pergunta como foi paga.
+            // pagamentoImediato=true (padrão se omitido) -> baixa o Caixa agora.
+            // false -> cria uma Despesa a pagar, com o vencimento informado.
+            @RequestParam(value = "pagamentoImediato", required = false) Boolean pagamentoImediato,
+            @RequestParam(value = "dataVencimento", required = false) String dataVencimento) {
 
         MultipartFile arquivoParaProcessar = ficheiro != null ? ficheiro : file;
 
@@ -68,7 +73,11 @@ public class ImportacaoController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Nenhum produto pôde ser extraído deste XML.");
             }
 
-            String relatorio = importacaoService.salvarProdutosLidos(dadosExtraidos);
+            java.time.LocalDate vencimento = (dataVencimento != null && !dataVencimento.isBlank())
+                    ? java.time.LocalDate.parse(dataVencimento)
+                    : null;
+
+            String relatorio = importacaoService.salvarProdutosLidos(dadosExtraidos, pagamentoImediato, vencimento);
 
             return ResponseEntity.ok(relatorio);
         } catch (NotaFiscalDuplicadaException e) {
