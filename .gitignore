@@ -1,1 +1,4 @@
 backend/backend/build.log
+.idea/
+*.iml
+target/
