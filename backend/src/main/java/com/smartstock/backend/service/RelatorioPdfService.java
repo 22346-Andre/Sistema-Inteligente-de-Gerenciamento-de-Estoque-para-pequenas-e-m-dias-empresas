@@ -65,6 +65,16 @@ public class RelatorioPdfService {
         return empresaRepository.findById(empresaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada no banco de dados."));
     }
+    /**
+     * Busca a movimentação só se ela for da empresa logada. Movimentação de
+     * outra empresa responde igual a "não existe" (404), para não permitir
+     * descobrir quais IDs existem em outros tenants.
+     */
+    private Movimentacao buscarMovimentacaoDaEmpresaLogada(Long movimentacaoId) {
+        return movimentacaoRepository.findByIdAndEmpresaId(movimentacaoId, getEmpresaLogada().getId())
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Movimentação não encontrada."));
+    }
+
     private LocalDateTime[] validarEParsearDatas(String dataInicio, String dataFim) {
         if (dataInicio == null || dataInicio.trim().isEmpty() || dataFim == null || dataFim.trim().isEmpty()) {
             return null; 
@@ -839,13 +849,13 @@ public class RelatorioPdfService {
 
   // CUPOM FISCAL DE BOBINA
     public byte[] gerarCupomFiscalPdf(Long movimentacaoId) {
-        Movimentacao mov = movimentacaoRepository.findById(movimentacaoId).orElseThrow();
+        Movimentacao mov = buscarMovimentacaoDaEmpresaLogada(movimentacaoId);
         List<Movimentacao> lista = new ArrayList<>(); lista.add(mov);
         return gerarCupomLoteInterno(lista, mov.getChaveNotaFiscal() != null ? mov.getChaveNotaFiscal() : "00000000000000");
     }
 
     public byte[] gerarCupomLotePdf(String chaveNotaFiscal) {
-        List<Movimentacao> movs = movimentacaoRepository.findByChaveNotaFiscal(chaveNotaFiscal);
+        List<Movimentacao> movs = movimentacaoRepository.findByChaveNotaFiscalAndEmpresaId(chaveNotaFiscal, getEmpresaLogada().getId());
         if (movs.isEmpty()) throw new RecursoNaoEncontradoException("Nota não encontrada.");
         return gerarCupomLoteInterno(movs, chaveNotaFiscal);
     }
@@ -911,14 +921,14 @@ public class RelatorioPdfService {
 
     // DANFE A4 OFICIAL
     public byte[] gerarDanfeSimplesPdf(Long movimentacaoId) {
-        Movimentacao mov = movimentacaoRepository.findById(movimentacaoId).orElseThrow();
+        Movimentacao mov = buscarMovimentacaoDaEmpresaLogada(movimentacaoId);
         List<Movimentacao> lista = new ArrayList<>(); lista.add(mov);
         String chave = mov.getChaveNotaFiscal() != null ? mov.getChaveNotaFiscal() : "35260312345678000199550010000001231000001234";
         return construirLayoutDanfe(lista, chave);
     }
 
     public byte[] gerarDanfeLotePdf(String chaveNotaFiscal) {
-        List<Movimentacao> movs = movimentacaoRepository.findByChaveNotaFiscal(chaveNotaFiscal);
+        List<Movimentacao> movs = movimentacaoRepository.findByChaveNotaFiscalAndEmpresaId(chaveNotaFiscal, getEmpresaLogada().getId());
         if (movs.isEmpty()) throw new RecursoNaoEncontradoException("Nota não encontrada.");
         return construirLayoutDanfe(movs, chaveNotaFiscal);
     }

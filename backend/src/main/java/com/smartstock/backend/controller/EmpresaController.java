@@ -105,6 +105,20 @@ public class EmpresaController {
     }
 
     
+    // O segredo não vem mais em /minha-empresa nem em /usuarios/me (Empresa.webhookSecret é
+    // WRITE_ONLY). Só ADMIN/SUPER_ADMIN da própria empresa consegue lê-lo, por este endpoint.
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPER_ADMIN')")
+    @GetMapping("/minha-empresa/webhook-secret")
+    public ResponseEntity<?> buscarWebhookSecret() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String emailLogado = authentication.getName();
+
+        Usuario usuarioLogado = usuarioRepository.findByEmail(emailLogado)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        return ResponseEntity.ok(java.util.Map.of("webhookSecret", usuarioLogado.getEmpresa().getWebhookSecret()));
+    }
+
     @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPER_ADMIN')")
     @PutMapping("/minha-empresa/webhook-secret")
     public ResponseEntity<?> regenerarWebhookSecret() {

@@ -44,7 +44,10 @@ public class Empresa {
     @Column(name = "dias_estoque_morto")
     private Integer diasParaEstoqueMorto = 90;
 
-   
+    // Credencial de acesso ao webhook de vendas. WRITE_ONLY: nunca sai em nenhum
+    // JSON (ex.: /usuarios/me, /empresas/minha-empresa, listagem de usuários).
+    // Quem precisa ver o segredo (ADMIN) usa GET /empresas/minha-empresa/webhook-secret.
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
     @Column(name = "webhook_secret", unique = true)
     private String webhookSecret;
 

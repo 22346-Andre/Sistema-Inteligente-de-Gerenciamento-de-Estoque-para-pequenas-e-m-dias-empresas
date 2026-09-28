@@ -40,8 +40,14 @@ public interface MovimentacaoRepository extends JpaRepository<Movimentacao, Long
     List<Movimentacao> findByProdutoIdAndDataMovimentacaoBetween(Long produtoId, LocalDateTime dataInicio, LocalDateTime dataFim);
 
    
-    @Query("SELECT m FROM Movimentacao m JOIN FETCH m.produto WHERE m.chaveNotaFiscal = :chaveNotaFiscal")
-    List<Movimentacao> findByChaveNotaFiscal(@Param("chaveNotaFiscal") String chaveNotaFiscal);
+    // Sempre filtrado por empresa: a chave da nota sozinha não identifica o dono
+    // do registro, e o endpoint de PDF é acessível a qualquer usuário logado.
+    @Query("SELECT m FROM Movimentacao m JOIN FETCH m.produto " +
+           "WHERE m.chaveNotaFiscal = :chaveNotaFiscal AND m.empresa.id = :empresaId")
+    List<Movimentacao> findByChaveNotaFiscalAndEmpresaId(@Param("chaveNotaFiscal") String chaveNotaFiscal,
+                                                         @Param("empresaId") Long empresaId);
+
+    java.util.Optional<Movimentacao> findByIdAndEmpresaId(Long id, Long empresaId);
 
     @Modifying
     @Query("DELETE FROM Movimentacao m WHERE m.dataMovimentacao < :dataLimite")
