@@ -18,16 +18,6 @@ public class TokenService {
     }
 
     public String gerarToken(Usuario usuario) {
-
-        // --- INÍCIO DO DEBUG (Agora no lugar certo, DENTRO do método!) ---
-        System.out.println("🚨 [DEBUG LOGIN] Fabricando token para: " + usuario.getEmail());
-        if (usuario.getEmpresa() != null) {
-            System.out.println("🚨 [DEBUG LOGIN] Empresa encontrada! ID: " + usuario.getEmpresa().getId());
-        } else {
-            System.out.println("🚨 [DEBUG LOGIN] ALERTA VERMELHO! A empresa chegou NULL no TokenService!");
-        }
-        // --- FIM DO DEBUG ---
-
         Instant now = Instant.now();
         long expiry = 3600L; // 1 hora
 

@@ -80,8 +80,9 @@ public class UsuarioService {
         if (dto.getSenha() == null || dto.getSenha().trim().isEmpty()) {
             throw new RuntimeException("A senha é obrigatória.");
         }
-        if (dto.getSenha().length() < 6) {
-            throw new RuntimeException("A senha deve ter no mínimo 6 caracteres.");
+        String erroSenha = com.smartstock.backend.exception.PoliticaSenha.validar(dto.getSenha());
+        if (erroSenha != null) {
+            throw new RuntimeException(erroSenha);
         }
         if (repository.findByEmail(dto.getEmail()).isPresent()) {
             throw new RuntimeException("Este e-mail já está cadastrado!");
@@ -186,6 +187,10 @@ public class UsuarioService {
     public void alterarSenha(AlterarSenhaDTO dto) {
         Usuario usuario = getUsuarioLogado();
 
+        String erroSenha = com.smartstock.backend.exception.PoliticaSenha.validar(dto.getNovaSenha());
+        if (erroSenha != null) {
+            throw new RuntimeException(erroSenha);
+        }
 
         if (dto.getSenhaAtual().equals(dto.getNovaSenha())) {
             throw new RuntimeException("Erro: A nova senha não pode ser igual à senha atual.");

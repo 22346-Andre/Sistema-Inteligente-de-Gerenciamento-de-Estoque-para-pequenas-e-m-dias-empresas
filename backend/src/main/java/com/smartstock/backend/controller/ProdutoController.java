@@ -1,5 +1,8 @@
 package com.smartstock.backend.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+import com.smartstock.backend.infra.security.Permissoes;
+
 import com.smartstock.backend.dto.ProdutoDTO;
 import com.smartstock.backend.model.Produto;
 import com.smartstock.backend.model.Movimentacao; 
@@ -74,6 +77,7 @@ public class ProdutoController {
         return ResponseEntity.ok(produtos);
     }
 
+    @PreAuthorize(Permissoes.ADMIN_OU_ESTOQUISTA)
     @PostMapping
     public ResponseEntity<Produto> cadastrar(@RequestBody @Valid ProdutoDTO dto) {
         return ResponseEntity.ok(service.salvar(dto));
@@ -84,18 +88,21 @@ public class ProdutoController {
         return service.listarEstoqueCritico();
     }
 
+    @PreAuthorize(Permissoes.ADMIN_OU_ESTOQUISTA)
     @PutMapping("/{id}")
     public ResponseEntity<Produto> atualizar(@PathVariable Long id, @RequestBody @Valid ProdutoDTO dto) {
         Produto produtoAtualizado = service.atualizar(id, dto);
         return ResponseEntity.ok(produtoAtualizado);
     }
 
+    @PreAuthorize(Permissoes.SOMENTE_ADMIN)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         service.deletar(id);
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize(Permissoes.ADMIN_OU_ESTOQUISTA)
     @PostMapping("/{id}/lotes")
     public ResponseEntity<Produto> darEntradaLote(@PathVariable Long id, @RequestBody com.smartstock.backend.dto.LoteDTO dto) {
         Produto produtoAtualizado = service.adicionarLote(id, dto, dto.getNovoPrecoCompra());

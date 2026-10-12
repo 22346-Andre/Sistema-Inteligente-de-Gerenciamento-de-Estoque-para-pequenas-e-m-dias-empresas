@@ -1,5 +1,8 @@
 package com.smartstock.backend.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+import com.smartstock.backend.infra.security.Permissoes;
+
 import com.smartstock.backend.dto.SugestaoCompraDTO;
 import com.smartstock.backend.dto.SugestaoFornecedorDTO;
 import com.smartstock.backend.service.SugestaoCompraService;
@@ -57,6 +60,7 @@ public ResponseEntity<List<SugestaoFornecedorDTO>> listarTextosFornecedores() {
 }
 
     //
+    @PreAuthorize(Permissoes.ADMIN_OU_ESTOQUISTA)
     @PostMapping("/enviar-email")
     public ResponseEntity<String> enviarPlanilhaPorEmail(@RequestParam String emailDestino) {
         try {

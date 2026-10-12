@@ -8,7 +8,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
 import java.util.UUID;
 
 
@@ -33,8 +37,12 @@ public class PasswordResetService {
 
     public void solicitarRecuperacao(String email) {
         usuarioRepository.findByEmail(email).ifPresent(usuario -> {
+            // O token que vai por e-mail é o valor em claro (é o que o usuário precisa);
+            // no banco fica só o hash, como se faz com senha — assim um vazamento do
+            // banco (backup, dump, injeção de leitura) não dá para ninguém redefinir
+            // senha de terceiros direto, só quem tiver o e-mail original.
             String token = UUID.randomUUID().toString();
-            usuario.setResetSenhaToken(token);
+            usuario.setResetSenhaToken(hash(token));
             usuario.setResetSenhaExpiracao(LocalDateTime.now().plusMinutes(VALIDADE_TOKEN_MINUTOS));
             usuarioRepository.save(usuario);
 
@@ -50,7 +58,12 @@ public class PasswordResetService {
             throw new RegraNegocioException("Link de recuperação inválido.");
         }
 
-        Usuario usuario = usuarioRepository.findByResetSenhaToken(token)
+        String erroSenha = com.smartstock.backend.exception.PoliticaSenha.validar(novaSenha);
+        if (erroSenha != null) {
+            throw new RegraNegocioException(erroSenha);
+        }
+
+        Usuario usuario = usuarioRepository.findByResetSenhaToken(hash(token))
                 .orElseThrow(() -> new RegraNegocioException("Link de recuperação inválido ou já utilizado."));
 
         if (usuario.getResetSenhaExpiracao() == null || LocalDateTime.now().isAfter(usuario.getResetSenhaExpiracao())) {
@@ -63,5 +76,15 @@ public class PasswordResetService {
         usuario.setResetSenhaToken(null);
         usuario.setResetSenhaExpiracao(null);
         usuarioRepository.save(usuario);
+    }
+
+    private String hash(String valor) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(valor.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            // SHA-256 é garantido pela JVM (java.security.Security) — nunca deveria cair aqui.
+            throw new IllegalStateException("Falha ao gerar hash do token de recuperação.", e);
+        }
     }
 }

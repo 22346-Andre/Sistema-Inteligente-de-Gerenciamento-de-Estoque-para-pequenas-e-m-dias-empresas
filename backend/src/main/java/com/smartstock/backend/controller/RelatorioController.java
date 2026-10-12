@@ -1,5 +1,8 @@
 package com.smartstock.backend.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+import com.smartstock.backend.infra.security.Permissoes;
+
 import com.smartstock.backend.service.RelatorioPdfService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -63,6 +66,7 @@ public class RelatorioController {
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
 
+    @PreAuthorize(Permissoes.SOMENTE_ADMIN)
     @GetMapping("/contabil/pdf")
     public ResponseEntity<byte[]> descarregarContabilPdf(
             @RequestParam(required = false) String dataInicio,
@@ -76,6 +80,7 @@ public class RelatorioController {
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
 
+    @PreAuthorize(Permissoes.SOMENTE_ADMIN)
     @GetMapping("/fluxo-caixa/pdf")
     public ResponseEntity<byte[]> descarregarFluxoCaixaPdf(
             @RequestParam(required = false) String dataInicio,
@@ -91,6 +96,7 @@ public class RelatorioController {
 
     // Balanço Patrimonial é sempre uma fotografia de agora — sem parâmetros
     // de data, diferente dos outros relatórios.
+    @PreAuthorize(Permissoes.SOMENTE_ADMIN)
     @GetMapping("/balanco-patrimonial/pdf")
     public ResponseEntity<byte[]> descarregarBalancoPatrimonialPdf() {
         byte[] pdfBytes = relatorioPdfService.gerarRelatorioBalancoPatrimonialPdf();
@@ -102,6 +108,7 @@ public class RelatorioController {
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
 
+    @PreAuthorize(Permissoes.SOMENTE_ADMIN)
     @GetMapping("/perdas/pdf")
     public ResponseEntity<byte[]> descarregarPerdasPdf(
             @RequestParam(required = false) String dataInicio,

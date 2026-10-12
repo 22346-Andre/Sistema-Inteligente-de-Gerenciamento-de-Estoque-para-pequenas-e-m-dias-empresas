@@ -1,5 +1,8 @@
 package com.smartstock.backend.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+import com.smartstock.backend.infra.security.Permissoes;
+
 import com.smartstock.backend.dto.FornecedorDTO;
 import com.smartstock.backend.model.Fornecedor;
 import com.smartstock.backend.model.Usuario;
@@ -46,6 +49,7 @@ public class FornecedorController {
     }
 
     //  2. CRIAR
+    @PreAuthorize(Permissoes.ADMIN_OU_ESTOQUISTA)
     @PostMapping
     public ResponseEntity<Fornecedor> criar(@RequestBody @Valid FornecedorDTO dto) {
         // O seu FornecedorService.salvar() deve vincular o fornecedor à empresa logada!
@@ -53,6 +57,7 @@ public class FornecedorController {
     }
 
     //  3. ATUALIZAR
+    @PreAuthorize(Permissoes.ADMIN_OU_ESTOQUISTA)
     @PutMapping("/{id}")
     public ResponseEntity<Fornecedor> atualizar(@PathVariable Long id, @RequestBody @Valid FornecedorDTO dto) {
         Usuario logado = getUsuarioLogado();
@@ -65,6 +70,7 @@ public class FornecedorController {
     }
 
     //  4. DELETAR
+    @PreAuthorize(Permissoes.SOMENTE_ADMIN)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         Usuario logado = getUsuarioLogado();

@@ -109,7 +109,7 @@ public class UsuarioController {
     }
 
     @PutMapping("/perfil/senha")
-    public ResponseEntity<String> alterarSenha(@RequestBody AlterarSenhaDTO dto) {
+    public ResponseEntity<String> alterarSenha(@RequestBody @Valid AlterarSenhaDTO dto) {
         try {
             service.alterarSenha(dto);
             return ResponseEntity.ok("Senha alterada com sucesso!");

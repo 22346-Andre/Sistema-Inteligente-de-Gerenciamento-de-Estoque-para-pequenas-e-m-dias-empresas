@@ -39,13 +39,20 @@ public class AuthService {
             if (idToken != null) {
                 GoogleIdToken.Payload payload = idToken.getPayload();
 
+                // Boolean.TRUE.equals: o campo é opcional no payload; ausente/nulo conta
+                // como não verificado, não como "sem checagem".
+                if (!Boolean.TRUE.equals(payload.getEmailVerified())) {
+                    throw new RegraNegocioException("O e-mail da conta Google não está verificado.");
+                }
+
                 // 3. Extrai o e-mail validado pelo Google
                 String email = payload.getEmail();
 
-                // 4. Procura esse e-mail no banco de dados
+                // 4. Procura esse e-mail no banco de dados. Mensagem genérica: não revela
+                // se o e-mail existe ou não no sistema (mesmo cuidado do "esqueci a senha").
                 Usuario usuario = usuarioRepository.findByEmail(email)
-                        .orElseThrow(() -> new RegraNegocioException("Erro: E-mail não cadastrado no SmartStock. Crie uma conta primeiro."));
-
+                        .orElseThrow(() -> new RegraNegocioException(
+                                "Não foi possível entrar com esta conta Google. Verifique se você já tem um cadastro no SmartStock."));
 
                 return tokenService.gerarToken(usuario);
 

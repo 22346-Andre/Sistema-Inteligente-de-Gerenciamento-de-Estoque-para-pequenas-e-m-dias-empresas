@@ -5,9 +5,8 @@ import jakarta.validation.ConstraintValidatorContext;
 
 /**
  * Validador customizado para Senha.
- * Verifica:
- * - Se tem no mínimo 6 caracteres
- * - Se não é nula ou vazia
+ * Delega a regra para PoliticaSenha, para não haver dois critérios divergentes
+ * (aqui e em UsuarioService.alterarSenha/salvar).
  */
 public class ValidadorSenha implements ConstraintValidator<ValidSenha, String> {
 
@@ -22,18 +21,13 @@ public class ValidadorSenha implements ConstraintValidator<ValidSenha, String> {
             return true;
         }
 
-        // Verifica se tem no mínimo 6 caracteres
-        if (value.length() < 6) {
-            addConstraintViolation(context, "A senha deve ter no mínimo 6 caracteres");
+        String erro = PoliticaSenha.validar(value);
+        if (erro != null) {
+            context.disableDefaultConstraintViolation();
+            context.buildConstraintViolationWithTemplate(erro).addConstraintViolation();
             return false;
         }
 
         return true;
-    }
-
-    private void addConstraintViolation(ConstraintValidatorContext context, String mensagem) {
-        context.disableDefaultConstraintViolation();
-        context.buildConstraintViolationWithTemplate(mensagem)
-                .addConstraintViolation();
     }
 }

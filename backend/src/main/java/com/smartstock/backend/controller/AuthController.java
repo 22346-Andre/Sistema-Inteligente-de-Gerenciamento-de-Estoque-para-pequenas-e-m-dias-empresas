@@ -63,7 +63,8 @@ public class AuthController {
 
     
     @PostMapping("/registrar-empresa")
-    public ResponseEntity<String> registrar(@RequestBody @Valid RegistroEmpresaDTO dto) {
+    public ResponseEntity<String> registrar(@RequestBody @Valid RegistroEmpresaDTO dto, HttpServletRequest request) {
+        loginAttemptService.consumirLimite("registrar-empresa|" + extrairIpCliente(request), 5);
         registroService.validarDisponibilidade(dto);
         String codigo = verificacaoCadastroService.iniciarCadastro(dto);
 
@@ -93,7 +94,8 @@ public class AuthController {
     //  reenvia um novo código, caso o usuário não tenha recebido ou o
     // código anterior tenha expirado.
     @PostMapping("/reenviar-codigo-cadastro")
-    public ResponseEntity<String> reenviarCodigoCadastro(@RequestBody @Valid EsqueciSenhaDTO dto) {
+    public ResponseEntity<String> reenviarCodigoCadastro(@RequestBody @Valid EsqueciSenhaDTO dto, HttpServletRequest request) {
+        loginAttemptService.consumirLimite("reenviar-codigo|" + extrairIpCliente(request), 5);
         String novoCodigo = verificacaoCadastroService.reenviarCodigo(dto.email());
         try {
             emailService.enviarCodigoVerificacaoCadastro(dto.email(), null, novoCodigo);
@@ -135,7 +137,11 @@ public class AuthController {
 
 
     @PostMapping("/login/google")
-    public ResponseEntity<?> loginComGoogle(@RequestBody GoogleLoginDTO dto) {
+    public ResponseEntity<?> loginComGoogle(@RequestBody GoogleLoginDTO dto, HttpServletRequest request) {
+        // O login por senha tem seu próprio limite (email+IP, email, IP); aqui só cabe
+        // o de IP, já que não há "e-mail digitado" antes de verificar o token do Google.
+        String ip = extrairIpCliente(request);
+        loginAttemptService.verificarBloqueioIp(ip);
         try {
             // O AuthService vai lá no Google, verifica o token e fabrica o nosso JWT
             String jwtValue = authService.loginComGoogle(dto.getToken());
@@ -144,13 +150,15 @@ public class AuthController {
             // Devolvemos exatamente no mesmo formato do login normal!
             return ResponseEntity.ok(new LoginResponse(jwtValue, expiresIn));
         } catch (RuntimeException e) {
+            loginAttemptService.registrarFalhaIp(ip);
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
    
     @PostMapping("/esqueci-senha")
-    public ResponseEntity<String> esqueciSenha(@RequestBody @Valid EsqueciSenhaDTO dto) {
+    public ResponseEntity<String> esqueciSenha(@RequestBody @Valid EsqueciSenhaDTO dto, HttpServletRequest request) {
+        loginAttemptService.consumirLimite("esqueci-senha|" + extrairIpCliente(request), 5);
         passwordResetService.solicitarRecuperacao(dto.email());
         return ResponseEntity.ok("Se esse e-mail estiver cadastrado, você vai receber um link de recuperação em instantes.");
     }

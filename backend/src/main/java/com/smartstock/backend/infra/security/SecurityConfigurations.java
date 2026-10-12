@@ -91,7 +91,12 @@ public class SecurityConfigurations {
 
     @Bean
     public JwtDecoder jwtDecoder() {
-        return NimbusJwtDecoder.withPublicKey(publicKey).build();
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(publicKey).build();
+        // Sem isso, o decoder aceita qualquer JWT assinado pela mesma chave, venha de
+        // onde vier. O issuer amarra o token a "só um token que o TokenService emitiu
+        // vale aqui" (defesa em profundidade; hoje só este backend usa essa chave).
+        decoder.setJwtValidator(org.springframework.security.oauth2.jwt.JwtValidators.createDefaultWithIssuer("smartstock-backend"));
+        return decoder;
     }
 
     @Bean

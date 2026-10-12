@@ -227,9 +227,7 @@ public class ProdutoService {
         produto.setEmpresa(empresa);
 
         if (dto.getFornecedorId() != null) {
-            Fornecedor fornecedor = fornecedorRepository.findById(dto.getFornecedorId())
-                    .orElseThrow(() -> new RuntimeException("Erro: Fornecedor ID " + dto.getFornecedorId() + " não encontrado!"));
-            produto.setFornecedor(fornecedor);
+            produto.setFornecedor(buscarFornecedorDaEmpresaLogada(dto.getFornecedorId()));
         }
 
         Produto produtoSalvo = repository.save(produto);
@@ -559,6 +557,20 @@ public class ProdutoService {
         return produtoAtualizado;
     }
 
+    /**
+     * Fornecedor só pode ser vinculado se for da empresa logada. Fornecedor de
+     * outra empresa responde igual a "não existe" (404), para não permitir
+     * descobrir IDs de outros tenants nem ler os dados deles no JSON de resposta.
+     */
+    private Fornecedor buscarFornecedorDaEmpresaLogada(Long fornecedorId) {
+        Fornecedor fornecedor = fornecedorRepository.findById(fornecedorId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Fornecedor não encontrado com ID: " + fornecedorId));
+        if (fornecedor.getEmpresa() == null || !fornecedor.getEmpresa().getId().equals(getEmpresaIdLogada())) {
+            throw new RecursoNaoEncontradoException("Fornecedor não encontrado com ID: " + fornecedorId);
+        }
+        return fornecedor;
+    }
+
     // Compra à vista -> baixa direto do Caixa agora. Compra a prazo -> vira
     // uma Despesa PENDENTE (Contas a Pagar), que só bate no Caixa quando for
     // marcada como paga (DespesaService.marcarComoPaga), do mesmo jeito que
@@ -583,9 +595,7 @@ public class ProdutoService {
         Long fornecedorId = dto.getFornecedorId() != null ? dto.getFornecedorId()
                 : (produto.getFornecedor() != null ? produto.getFornecedor().getId() : null);
         if (fornecedorId != null) {
-            Fornecedor fornecedor = fornecedorRepository.findById(fornecedorId)
-                    .orElseThrow(() -> new RecursoNaoEncontradoException("Fornecedor não encontrado: id=" + fornecedorId));
-            despesa.setFornecedor(fornecedor);
+            despesa.setFornecedor(buscarFornecedorDaEmpresaLogada(fornecedorId));
         }
 
         despesaRepository.save(despesa);

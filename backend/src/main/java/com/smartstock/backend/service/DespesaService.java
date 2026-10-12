@@ -45,9 +45,7 @@ public class DespesaService {
         despesa.setStatus(StatusConta.PENDENTE);
 
         if (dto.getFornecedorId() != null) {
-            Fornecedor fornecedor = fornecedorRepository.findById(dto.getFornecedorId())
-                    .orElseThrow(() -> new RecursoNaoEncontradoException("Fornecedor não encontrado: id=" + dto.getFornecedorId()));
-            despesa.setFornecedor(fornecedor);
+            despesa.setFornecedor(buscarFornecedorDaEmpresa(dto.getFornecedorId(), empresaId));
         }
 
         return despesaRepository.save(despesa);
@@ -86,9 +84,7 @@ public class DespesaService {
         }
 
         if (dto.getFornecedorId() != null) {
-            Fornecedor fornecedor = fornecedorRepository.findById(dto.getFornecedorId())
-                    .orElseThrow(() -> new RecursoNaoEncontradoException("Fornecedor não encontrado: id=" + dto.getFornecedorId()));
-            despesa.setFornecedor(fornecedor);
+            despesa.setFornecedor(buscarFornecedorDaEmpresa(dto.getFornecedorId(), empresaId));
         }
 
         return despesaRepository.save(despesa);
@@ -97,6 +93,17 @@ public class DespesaService {
     public void excluir(Long id, Long empresaId) {
         Despesa despesa = buscarDaEmpresa(id, empresaId);
         despesaRepository.delete(despesa);
+    }
+
+    // Fornecedor de outra empresa responde igual a "não existe" (404): não deixa
+    // vincular nem descobrir fornecedores de outros tenants.
+    private Fornecedor buscarFornecedorDaEmpresa(Long fornecedorId, Long empresaId) {
+        Fornecedor fornecedor = fornecedorRepository.findById(fornecedorId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Fornecedor não encontrado: id=" + fornecedorId));
+        if (fornecedor.getEmpresa() == null || !fornecedor.getEmpresa().getId().equals(empresaId)) {
+            throw new RecursoNaoEncontradoException("Fornecedor não encontrado: id=" + fornecedorId);
+        }
+        return fornecedor;
     }
 
     private Despesa buscarDaEmpresa(Long id, Long empresaId) {

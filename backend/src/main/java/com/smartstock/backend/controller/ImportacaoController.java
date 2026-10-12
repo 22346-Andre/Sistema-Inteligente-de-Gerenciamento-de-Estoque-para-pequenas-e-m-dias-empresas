@@ -1,5 +1,8 @@
 package com.smartstock.backend.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+import com.smartstock.backend.infra.security.Permissoes;
+
 import com.smartstock.backend.service.ImportacaoService;
 import com.smartstock.backend.service.NotaFiscalDuplicadaException;
 import org.springframework.http.HttpStatus;
@@ -22,6 +25,7 @@ public class ImportacaoController {
     }
 
 
+    @PreAuthorize(Permissoes.ADMIN_OU_ESTOQUISTA)
     @PostMapping(value = "/produtos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> importarEmLote(
             @RequestParam(value = "ficheiro", required = false) MultipartFile ficheiro,
@@ -46,6 +50,7 @@ public class ImportacaoController {
         }
     }
 
+    @PreAuthorize(Permissoes.ADMIN_OU_ESTOQUISTA)
     @PostMapping(value = "/xml-direto", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> importarXmlDireto(
             @RequestParam(value = "ficheiro", required = false) MultipartFile ficheiro,

@@ -105,12 +105,25 @@ public class TratadorDeErros {
     }
 
     // 7. CAPTURA ERROS GERAIS DO SISTEMA (RuntimeException genérica ainda não migrada
-    // pra uma exceção específica acima). Mantido como rede de segurança.
+    // pra uma exceção específica acima — RegraNegocioException, IllegalStateException e
+    // IllegalArgumentException de validação passam por aqui de propósito, com mensagem
+    // pensada pro usuário). Mantido como rede de segurança.
+    //
+    // Uma RuntimeException SEM mensagem (ex.: NullPointerException) quase sempre é bug,
+    // não regra de negócio — nesse caso não expomos ex.getMessage() (pode vir null, ou
+    // com detalhe técnico tipo nome de classe/campo), logamos com stacktrace pra
+    // investigar, e devolvemos 500 com mensagem genérica em vez de 400.
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, String>> tratarErrosDeRegraDeNegocio(RuntimeException ex) {
         Map<String, String> resposta = new HashMap<>();
-        resposta.put("erro", ex.getMessage());
 
+        if (ex.getMessage() == null || ex.getMessage().isBlank()) {
+            logger.error("Erro inesperado sem mensagem de negócio", ex);
+            resposta.put("erro", "Ocorreu um erro inesperado. Tente novamente em instantes.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(resposta);
+        }
+
+        resposta.put("erro", ex.getMessage());
         // Retorna 400 (Bad Request) - Indica que a requisição não cumpriu uma regra de negócio
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(resposta);
     }
@@ -121,5 +134,16 @@ public class TratadorDeErros {
         Map<String, String> resposta = new HashMap<>();
         resposta.put("erro", ex.getReason());
         return ResponseEntity.status(ex.getStatusCode()).body(resposta);
+    }
+
+    // 9. REDE DE SEGURANÇA FINAL — qualquer coisa que não seja RuntimeException
+    // (exceção checada, Error, etc.) e que teria vazado como whitelabel error page
+    // do Spring, com stacktrace. Loga completo no servidor, devolve só 500 genérico.
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, String>> tratarErroNaoMapeado(Exception ex) {
+        logger.error("Erro não tratado", ex);
+        Map<String, String> resposta = new HashMap<>();
+        resposta.put("erro", "Ocorreu um erro inesperado. Tente novamente em instantes.");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(resposta);
     }
 }

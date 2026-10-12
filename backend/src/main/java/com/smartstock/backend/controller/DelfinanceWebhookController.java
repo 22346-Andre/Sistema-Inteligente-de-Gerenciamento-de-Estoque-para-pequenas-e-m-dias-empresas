@@ -9,6 +9,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+
 /**
  * Rota pública (sem JWT — POST /api/webhooks/** já é permitAll em
  * SecurityConfigurations, ver WebhookController) que recebe os eventos Pix
@@ -52,7 +55,7 @@ public class DelfinanceWebhookController {
             valorRecebido = valorRecebido.substring(7).trim();
         }
 
-        if (valorRecebido == null || !valorRecebido.equals(webhookSecretConfigurado)) {
+        if (valorRecebido == null || !comparacaoSegura(valorRecebido, webhookSecretConfigurado)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Credencial de webhook inválida.");
         }
 
@@ -69,5 +72,12 @@ public class DelfinanceWebhookController {
         }
 
         return ResponseEntity.ok().build();
+    }
+
+    // equals() sai assim que acha o primeiro caractere diferente — um atacante pode medir
+    // esse tempo e, tentativa após tentativa, descobrir o segredo caractere a caractere.
+    // MessageDigest.isEqual sempre compara todos os bytes, em tempo constante.
+    private boolean comparacaoSegura(String a, String b) {
+        return MessageDigest.isEqual(a.getBytes(StandardCharsets.UTF_8), b.getBytes(StandardCharsets.UTF_8));
     }
 }
