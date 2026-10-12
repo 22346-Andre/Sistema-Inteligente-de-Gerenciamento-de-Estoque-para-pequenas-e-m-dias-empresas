@@ -26,6 +26,10 @@ public class SugestaoCompraService {
 
     private static final int PRAZO_ENTREGA_PADRAO_DIAS = 7; // fallback enquanto Fornecedor não tiver o campo
 
+    // Janela da curva ABC usada pelo "botão de pânico" (ver RegraRupturaEstoque): olha o
+    // faturamento dos últimos 90 dias para saber se o item zerado é importante (A ou B).
+    private static final int DIAS_CURVA_ABC_RUPTURA = 90;
+
     @Autowired
     private ProdutoRepository produtoRepository;
 
@@ -37,6 +41,9 @@ public class SugestaoCompraService {
 
     @Autowired
     private FornecedorService fornecedorService;
+
+    @Autowired
+    private CurvaAbcService curvaAbcService;
 
     private Long getEmpresaIdLogada() {
         if (SecurityContextHolder.getContext().getAuthentication() == null ||
@@ -62,6 +69,20 @@ public class SugestaoCompraService {
         // Map.computeIfAbsent NÃO cacheia quando a função devolve null (o que
         // aconteceria toda vez pra um fornecedor sem histórico suficiente).
         Map<Long, java.util.Optional<Double>> prazoObservadoPorFornecedor = new java.util.HashMap<>();
+
+        // Classe ABC (faturamento, 90 dias) só é consultada se houver item zerado com
+        // estoque mínimo > 0 — o único caso em que a regra de ruptura precisa dela.
+        // A curva é cacheada (CurvaAbcService), então não pesa a cada requisição.
+        Map<Long, String> classeAbcPorProduto = null;
+        boolean precisaClasseAbc = produtosCriticos.stream().anyMatch(prod ->
+                (prod.getQuantidade() == null || prod.getQuantidade() <= 0)
+                        && prod.getEstoqueMinimo() != null && prod.getEstoqueMinimo() > 0);
+        if (precisaClasseAbc) {
+            classeAbcPorProduto = new java.util.HashMap<>();
+            for (var item : curvaAbcService.calcular(empresaId, CurvaAbcService.Criterio.FATURAMENTO, DIAS_CURVA_ABC_RUPTURA)) {
+                classeAbcPorProduto.put(item.getProdutoId(), item.getClasse());
+            }
+        }
 
         for (Produto p : produtosCriticos) {
             int atual = p.getQuantidade() != null ? p.getQuantidade() : 0;
@@ -99,10 +120,12 @@ public class SugestaoCompraService {
 
             double grauUrgencia = fuzzyUrgenciaService.calcularUrgencia(nivelEstoquePct, giroVendas, prazoEntregaDias);
 
-           
-            if (atual == 0) {
-                grauUrgencia = Math.max(grauUrgencia, 85.0);
-            }
+            // "Botão de pânico": estoque zerado sobe a urgência para >= 85, mas só se o item
+            // for importante (classe A/B) e o gestor aceitar ficar sem ele (mínimo > 0).
+            // Senão o fuzzy decide — evita recomprar item que saiu de linha ou sem importância.
+            String classeAbc = classeAbcPorProduto != null ? classeAbcPorProduto.get(p.getId()) : null;
+            boolean ruptura = RegraRupturaEstoque.aplica(atual, minimo, classeAbc);
+            grauUrgencia = RegraRupturaEstoque.aplicarPiso(grauUrgencia, ruptura);
 
             // --- Monta o DTO ---
             SugestaoCompraDTO dto = new SugestaoCompraDTO();
@@ -126,15 +149,17 @@ public class SugestaoCompraService {
             dto.setPrazoEntregaLabel(classificarPrazo(prazoEntregaDias));
             dto.setPrazoEntregaOrigem(prazoEntregaOrigem);
 
-            // Estoque zerado é sempre URGENTE, independente do fuzzy (regra de negócio dura)
-            dto.setUrgencia(atual == 0 ? "URGENTE" : (grauUrgencia >= 55 ? "URGENTE" : "ATENCAO"));
+            dto.setUrgencia(ruptura || grauUrgencia >= 55 ? "URGENTE" : "ATENCAO");
+            dto.setUrgenciaOrigem(ruptura ? "RUPTURA" : "FUZZY");
+            dto.setClasseAbc(classeAbc);
 
-            // --- Quantidade sugerida: base (repor até margem de segurança) + ajuste pela urgência ---
-            int margemSeguranca = (int) Math.ceil(minimo * 0.5);
-            int alvo = minimo + margemSeguranca;
-            int quantidadeBase = Math.max(alvo - atual, 1);
-            int ajusteUrgencia = (int) Math.round((grauUrgencia / 100.0) * minimo * 0.3); // até +30% do mínimo em casos críticos
-            dto.setQuantidadeSugerida(quantidadeBase + ajusteUrgencia);
+            // --- Quanto comprar: vale o maior entre repor o mínimo e cobrir a demanda
+            // (entrega + 15 dias de venda + reserva). Ver CalculadoraQuantidadeCompra. ---
+            CalculadoraQuantidadeCompra.Resultado qtd = CalculadoraQuantidadeCompra.calcular(
+                    atual, minimo, saidas30dias != null ? saidas30dias : 0, prazoEntregaDias, grauUrgencia);
+            dto.setQuantidadeSugerida(qtd.quantidade());
+            dto.setConsumoDiarioMedio(Math.round(qtd.consumoDiarioMedio() * 10.0) / 10.0);
+            dto.setQuantidadeSugeridaMotivo(qtd.motivo());
 
             BigDecimal custo = p.getPrecoCusto() != null ? p.getPrecoCusto() : BigDecimal.ZERO;
             dto.setValorUnitario(custo);

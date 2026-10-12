@@ -26,4 +26,13 @@ public class SugestaoCompraDTO {
 
     
     private String prazoEntregaOrigem;
+
+    // "RUPTURA" = o botão de pânico elevou a urgência (estoque zerado de item classe A/B);
+    // "FUZZY" = urgência veio só do motor fuzzy.
+    private String urgenciaOrigem;
+    private String classeAbc;                // "A" | "B" | "C" | null (só consultada em estoque zerado)
+
+    // Explicação da quantidade sugerida, mostrada ao gestor.
+    private Double consumoDiarioMedio;       // unidades/dia (vendas dos últimos 30 dias / 30)
+    private String quantidadeSugeridaMotivo;
 }
