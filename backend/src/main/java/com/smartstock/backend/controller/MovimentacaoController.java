@@ -6,6 +6,7 @@ import com.smartstock.backend.exception.RecursoNaoEncontradoException;
 import com.smartstock.backend.exception.RegraNegocioException;
 import com.smartstock.backend.model.Movimentacao;
 import com.smartstock.backend.service.MovimentacaoService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,7 +29,7 @@ public class MovimentacaoController {
 
     //
     @PostMapping("/pdv")
-    public ResponseEntity<?> registrarPDV(@RequestBody MovimentacaoPdvDTO dto) {
+    public ResponseEntity<?> registrarPDV(@RequestBody @Valid MovimentacaoPdvDTO dto) {
         try {
             Movimentacao movimentacao = service.registrarViaPDV(dto);
             return ResponseEntity.ok(movimentacao);

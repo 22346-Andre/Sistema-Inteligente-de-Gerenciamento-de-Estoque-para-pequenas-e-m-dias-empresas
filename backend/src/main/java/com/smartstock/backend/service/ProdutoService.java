@@ -35,6 +35,9 @@ public class ProdutoService {
     private LoteRepository loteRepository;
 
     @Autowired
+    private LoteEstoqueService loteEstoqueService;
+
+    @Autowired
     private FornecedorRepository fornecedorRepository;
 
     @Autowired
@@ -267,7 +270,7 @@ public class ProdutoService {
 
     @jakarta.transaction.Transactional
     public Produto atualizar(Long id, ProdutoDTO dto) {
-        Produto produto = repository.findById(id)
+        Produto produto = repository.buscarComLockParaAtualizacao(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Produto não encontrado com o ID: " + id));
 
         if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
@@ -275,6 +278,8 @@ public class ProdutoService {
         }
 
         Integer quantidadeAntes = produto.getQuantidade() != null ? produto.getQuantidade() : 0;
+        Integer quantidadeDepois = dto.getQuantidade() != null ? dto.getQuantidade() : quantidadeAntes;
+        int diferenca = quantidadeDepois - quantidadeAntes;
 
         produto.setNome(dto.getNome());
         produto.setDescricao(dto.getDescricao());
@@ -283,10 +288,6 @@ public class ProdutoService {
         produto.setPrecoCusto(dto.getPrecoCusto());
         produto.setPrecoVenda(dto.getPrecoVenda());
         produto.setEstoqueMinimo(dto.getQuantidadeMinima() != null ? dto.getQuantidadeMinima() : 5);
-        // Se o payload não enviar quantidade, mantém a quantidade atual em vez de
-        // gravar null (o que quebraria com NPE qualquer comparação numérica
-        // posterior, como em MovimentacaoService.registrarViaPDV/registrarSaida).
-        produto.setQuantidade(dto.getQuantidade() != null ? dto.getQuantidade() : quantidadeAntes);
         produto.setNcm(dto.getNcm());
         produto.setCfop(dto.getCfop());
 
@@ -311,13 +312,21 @@ public class ProdutoService {
             produto.setFornecedor(null);
         }
 
-        Produto produtoAtualizado = repository.save(produto);
-
         // Se a edição mudou a quantidade em estoque, registra a diferença como
         // movimentação (ENTRADA ou SAIDA), para manter o rastro completo usado
         // pelos relatórios retroativos (Balanço Geral / Inventário Fiscal).
-        Integer quantidadeDepois = dto.getQuantidade() != null ? dto.getQuantidade() : quantidadeAntes;
-        int diferenca = quantidadeDepois - quantidadeAntes;
+        if (diferenca != 0) {
+            if (diferenca > 0) {
+                loteEstoqueService.registrarEntrada(produto, diferenca);
+            } else {
+                loteEstoqueService.baixar(produto, Math.abs(diferenca));
+            }
+        }
+
+        // Leave the old quantity on the entity until any legacy lot balance has
+        // been initialized and reconciled by LoteEstoqueService.
+        produto.setQuantidade(quantidadeDepois);
+        Produto produtoAtualizado = repository.save(produto);
 
         if (diferenca != 0) {
             Movimentacao ajuste = new Movimentacao();
@@ -414,6 +423,10 @@ public class ProdutoService {
 
     private Movimentacao registrarSaidaInterno(Long produtoId, Integer quantidadeDesejada, TipoMovimentacao tipo,
                                                 String motivo, String chaveNotaFiscal, FormaPagamento formaPagamento, Long empresaIdDono) {
+        if (quantidadeDesejada == null || quantidadeDesejada <= 0) {
+            throw new com.smartstock.backend.exception.RegraNegocioException(
+                    "A quantidade de saída deve ser maior que zero.");
+        }
 
         // Lock pessimista: trava essa linha de produto até o fim da transação, pra
         // duas baixas de estoque simultâneas no MESMO produto não pisarem uma na
@@ -430,21 +443,7 @@ public class ProdutoService {
             throw new RuntimeException("Estoque insuficiente! Saldo atual: " + produto.getQuantidade());
         }
 
-        List<Lote> lotes = loteRepository.findLotesDisponiveisParaBaixa(produtoId);
-        int quantidadeRestante = quantidadeDesejada;
-
-        for (Lote lote : lotes) {
-            if (quantidadeRestante == 0) break;
-
-            if (lote.getQuantidade() <= quantidadeRestante) {
-                quantidadeRestante -= lote.getQuantidade();
-                lote.setQuantidade(0);
-            } else {
-                lote.setQuantidade(lote.getQuantidade() - quantidadeRestante);
-                quantidadeRestante = 0;
-            }
-            loteRepository.save(lote);
-        }
+        loteEstoqueService.baixar(produto, quantidadeDesejada);
 
         produto.setQuantidade(produto.getQuantidade() - quantidadeDesejada);
         Produto produtoAtualizado = repository.save(produto);
@@ -497,7 +496,7 @@ public class ProdutoService {
     @jakarta.transaction.Transactional
     public Produto adicionarLote(Long produtoId, LoteDTO dto, BigDecimal novoPrecoCompra) {
 
-        Produto produto = repository.findById(produtoId)
+        Produto produto = repository.buscarComLockParaAtualizacao(produtoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Produto não encontrado"));
 
         if (!produto.getEmpresa().getId().equals(getEmpresaIdLogada())) {
@@ -507,6 +506,10 @@ public class ProdutoService {
         int quantidadeAtual = produto.getQuantidade() != null ? produto.getQuantidade() : 0;
         BigDecimal precoCustoAtual = produto.getPrecoCusto() != null ? produto.getPrecoCusto() : BigDecimal.ZERO;
         int novaQuantidade = dto.getQuantidade();
+        if (novaQuantidade <= 0) {
+            throw new com.smartstock.backend.exception.RegraNegocioException(
+                    "A quantidade do lote deve ser maior que zero.");
+        }
 
         if (novoPrecoCompra != null && novoPrecoCompra.compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal valorEstoqueAtual = precoCustoAtual.multiply(new BigDecimal(quantidadeAtual));

@@ -5,6 +5,7 @@ import com.opencsv.bean.CsvDate;
 import com.smartstock.backend.model.Imposto;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -34,9 +35,11 @@ public class ProdutoDTO {
     @CsvBindByName(column = "precoVenda")
     private BigDecimal precoVenda;
 
+    @PositiveOrZero(message = "Quantidade em estoque não pode ser negativa")
     @CsvBindByName(column = "quantidade")
     private Integer quantidade;
 
+    @PositiveOrZero(message = "Quantidade mínima não pode ser negativa")
     @CsvBindByName(column = "quantidadeMinima")
     private Integer quantidadeMinima;
 

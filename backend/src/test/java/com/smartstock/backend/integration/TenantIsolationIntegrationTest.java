@@ -1,7 +1,9 @@
 package com.smartstock.backend.integration;
 
 import com.smartstock.backend.model.Empresa;
+import com.smartstock.backend.model.Movimentacao;
 import com.smartstock.backend.model.Produto;
+import com.smartstock.backend.model.TipoMovimentacao;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
 import com.smartstock.backend.service.DashboardService;
@@ -22,6 +24,8 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.smartstock.backend.repository.MovimentacaoRepository;
+import com.smartstock.backend.repository.LoteRepository;
+import com.smartstock.backend.repository.UsuarioRepository;
 import org.junit.jupiter.api.AfterEach;
 /**
  * O bug mais caro que existe num sistema multi-tenant: a Empresa A
@@ -48,6 +52,12 @@ class TenantIsolationIntegrationTest extends IntegrationTestBase {
     @Autowired
     private MovimentacaoRepository movimentacaoRepository;
 
+    @Autowired
+    private LoteRepository loteRepository;
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
+
     private Empresa empresaA;
     private Empresa empresaB;
 
@@ -67,7 +77,9 @@ class TenantIsolationIntegrationTest extends IntegrationTestBase {
     @AfterEach
     void limparDados() {
     movimentacaoRepository.deleteAll();
+    loteRepository.deleteAll();
     produtoRepository.deleteAll();
+    usuarioRepository.deleteAll();
     empresaRepository.deleteAll();
 }
 
@@ -148,5 +160,30 @@ class TenantIsolationIntegrationTest extends IntegrationTestBase {
 
         assertEquals(7, produtoA.getQuantidade(), "Venda deveria ter debitado só o estoque da Empresa A (10 -> 7)");
         assertEquals(50, produtoB.getQuantidade(), "Estoque da Empresa B tem que continuar intacto em 50");
+    }
+
+    @Test
+    void historicoDeProdutoNaoExpoeMovimentacoesDeOutraEmpresa() {
+        Produto produtoA = produtoRepository.findByCodigoBarrasAndEmpresaId("7891000000001", empresaA.getId()).orElseThrow();
+        Produto produtoB = produtoRepository.findByCodigoBarrasAndEmpresaId("7891000000001", empresaB.getId()).orElseThrow();
+        salvarMovimentacao(produtoA);
+        salvarMovimentacao(produtoB);
+
+        autenticarComo(empresaA.getId());
+        List<Movimentacao> historicoA = movimentacaoService.listarPorProduto(produtoB.getId());
+        List<Movimentacao> historicoProprio = movimentacaoService.listarPorProduto(produtoA.getId());
+
+        assertTrue(historicoA.isEmpty());
+        assertEquals(1, historicoProprio.size());
+        assertEquals(empresaA.getId(), historicoProprio.getFirst().getEmpresa().getId());
+    }
+
+    private void salvarMovimentacao(Produto produto) {
+        Movimentacao movimentacao = new Movimentacao();
+        movimentacao.setProduto(produto);
+        movimentacao.setEmpresa(produto.getEmpresa());
+        movimentacao.setTipo(TipoMovimentacao.SAIDA);
+        movimentacao.setQuantidade(1);
+        movimentacaoRepository.save(movimentacao);
     }
 }

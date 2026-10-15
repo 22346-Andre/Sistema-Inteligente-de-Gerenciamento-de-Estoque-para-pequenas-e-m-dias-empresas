@@ -8,6 +8,8 @@ import com.smartstock.backend.model.Produto;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.MovimentacaoRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
+import com.smartstock.backend.repository.LoteRepository;
+import com.smartstock.backend.repository.UsuarioRepository;
 import com.smartstock.backend.service.MovimentacaoService;
 import com.smartstock.backend.service.RelatorioPdfService;
 import org.junit.jupiter.api.AfterEach;
@@ -38,6 +40,8 @@ class RelatorioPdfIsolamentoIntegrationTest extends IntegrationTestBase {
     @Autowired private EmpresaRepository empresaRepository;
     @Autowired private ProdutoRepository produtoRepository;
     @Autowired private MovimentacaoRepository movimentacaoRepository;
+    @Autowired private LoteRepository loteRepository;
+    @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private MovimentacaoService movimentacaoService;
     @Autowired private RelatorioPdfService relatorioPdfService;
 
@@ -66,7 +70,9 @@ class RelatorioPdfIsolamentoIntegrationTest extends IntegrationTestBase {
     void limpar() {
         SecurityContextHolder.clearContext();
         movimentacaoRepository.deleteAll();
+        loteRepository.deleteAll();
         produtoRepository.deleteAll();
+        usuarioRepository.deleteAll();
         empresaRepository.deleteAll();
     }
 

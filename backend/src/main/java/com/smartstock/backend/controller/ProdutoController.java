@@ -111,7 +111,7 @@ public class ProdutoController {
 
 
     @PostMapping("/{id}/saida")
-    public ResponseEntity<Movimentacao> registarSaida(@PathVariable Long id, @RequestBody com.smartstock.backend.dto.SaidaDTO dto) {
+    public ResponseEntity<Movimentacao> registarSaida(@PathVariable Long id, @RequestBody @Valid com.smartstock.backend.dto.SaidaDTO dto) {
 
         Movimentacao movSalva = service.registrarSaida(
                 id,

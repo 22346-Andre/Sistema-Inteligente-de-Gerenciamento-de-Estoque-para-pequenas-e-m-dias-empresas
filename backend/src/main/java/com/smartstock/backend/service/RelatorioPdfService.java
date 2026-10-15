@@ -20,6 +20,7 @@ import com.smartstock.backend.repository.ProdutoRepository;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
@@ -848,12 +849,14 @@ public class RelatorioPdfService {
 
 
   // CUPOM FISCAL DE BOBINA
+    @Transactional(readOnly = true)
     public byte[] gerarCupomFiscalPdf(Long movimentacaoId) {
         Movimentacao mov = buscarMovimentacaoDaEmpresaLogada(movimentacaoId);
         List<Movimentacao> lista = new ArrayList<>(); lista.add(mov);
         return gerarCupomLoteInterno(lista, mov.getChaveNotaFiscal() != null ? mov.getChaveNotaFiscal() : "00000000000000");
     }
 
+    @Transactional(readOnly = true)
     public byte[] gerarCupomLotePdf(String chaveNotaFiscal) {
         List<Movimentacao> movs = movimentacaoRepository.findByChaveNotaFiscalAndEmpresaId(chaveNotaFiscal, getEmpresaLogada().getId());
         if (movs.isEmpty()) throw new RecursoNaoEncontradoException("Nota não encontrada.");
@@ -876,7 +879,12 @@ public class RelatorioPdfService {
             Font fontNegrito = FontFactory.getFont(FontFactory.COURIER_BOLD, 7);
             Font fontMicro = FontFactory.getFont(FontFactory.COURIER, 6);
 
-            document.add(new Paragraph(empresa.getNomeFantasia().toUpperCase() + "\nCNPJ: " + (empresa.getCnpj() != null ? empresa.getCnpj() : "N/I") + "\n----------------------------------------", fontNormal));
+            String nomeEmpresa = empresa.getNomeFantasia() != null && !empresa.getNomeFantasia().isBlank()
+                    ? empresa.getNomeFantasia()
+                    : empresa.getRazaoSocial();
+            document.add(new Paragraph((nomeEmpresa != null ? nomeEmpresa : "EMPRESA").toUpperCase()
+                    + "\nCNPJ: " + (empresa.getCnpj() != null ? empresa.getCnpj() : "N/I")
+                    + "\n----------------------------------------", fontNormal));
             document.add(new Paragraph("CUPOM FISCAL ELETRONICO - SAT", fontNegrito));
             document.add(new Paragraph("----------------------------------------\nDATA: " + movs.get(0).getDataMovimentacao().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) + "\n----------------------------------------", fontNormal));
             document.add(new Paragraph("#|COD|DESC|QTD|UN|VL UN R$|VL TOT R$", fontNegrito));
@@ -913,13 +921,16 @@ public class RelatorioPdfService {
             document.add(new Paragraph("----------------------------------------\nCHAVE DE ACESSO:\n" + chaveFmt + "\n\nOBRIGADO PELA PREFERENCIA", fontMicro));
 
             document.close();
-        } catch (Exception e) { e.printStackTrace(); }
+        } catch (Exception e) {
+            throw new IllegalStateException("Não foi possível gerar o cupom fiscal.", e);
+        }
         return out.toByteArray();
     }
 
 
 
     // DANFE A4 OFICIAL
+    @Transactional(readOnly = true)
     public byte[] gerarDanfeSimplesPdf(Long movimentacaoId) {
         Movimentacao mov = buscarMovimentacaoDaEmpresaLogada(movimentacaoId);
         List<Movimentacao> lista = new ArrayList<>(); lista.add(mov);
@@ -927,6 +938,7 @@ public class RelatorioPdfService {
         return construirLayoutDanfe(lista, chave);
     }
 
+    @Transactional(readOnly = true)
     public byte[] gerarDanfeLotePdf(String chaveNotaFiscal) {
         List<Movimentacao> movs = movimentacaoRepository.findByChaveNotaFiscalAndEmpresaId(chaveNotaFiscal, getEmpresaLogada().getId());
         if (movs.isEmpty()) throw new RecursoNaoEncontradoException("Nota não encontrada.");
@@ -1107,7 +1119,9 @@ public class RelatorioPdfService {
             document.add(obs);
 
             document.close();
-        } catch (Exception e) { e.printStackTrace(); }
+        } catch (Exception e) {
+            throw new IllegalStateException("Não foi possível gerar o DANFE.", e);
+        }
         return out.toByteArray();
     }
 

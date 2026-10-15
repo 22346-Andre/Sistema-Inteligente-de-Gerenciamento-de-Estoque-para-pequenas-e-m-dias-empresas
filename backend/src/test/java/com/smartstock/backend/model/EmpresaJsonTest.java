@@ -16,7 +16,7 @@ class EmpresaJsonTest {
         empresa.setRazaoSocial("Empresa A LTDA");
         empresa.setWebhookSecret("segredo-super-secreto");
 
-        String json = new ObjectMapper().writeValueAsString(empresa);
+        String json = new ObjectMapper().findAndRegisterModules().writeValueAsString(empresa);
 
         assertFalse(json.contains("webhookSecret"), "O campo não pode aparecer no JSON");
         assertFalse(json.contains("segredo-super-secreto"), "O valor não pode aparecer no JSON");

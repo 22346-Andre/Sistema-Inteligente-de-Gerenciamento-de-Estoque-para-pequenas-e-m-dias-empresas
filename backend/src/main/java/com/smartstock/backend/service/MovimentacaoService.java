@@ -7,6 +7,7 @@ import com.smartstock.backend.model.Produto;
 import com.smartstock.backend.model.TipoMovimentacao;
 import com.smartstock.backend.repository.MovimentacaoRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
+import com.smartstock.backend.exception.RegraNegocioException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -25,6 +26,9 @@ public class MovimentacaoService {
 
     @Autowired
     private ProdutoRepository produtoRepository;
+
+    @Autowired
+    private LoteEstoqueService loteEstoqueService;
 
     // --- MÉTODO AUXILIAR DO JWT ---
     private Long getEmpresaIdLogada() {
@@ -55,20 +59,20 @@ public class MovimentacaoService {
     }
 
     public List<Movimentacao> listarPorProduto(Long produtoId) {
-        // Busca todas as movimentações do produto específico
-        return movimentacaoRepository.findByProdutoIdOrderByDataMovimentacaoDesc(produtoId);
+        return movimentacaoRepository.findByProdutoIdAndEmpresaIdOrderByDataMovimentacaoDesc(
+                produtoId, getEmpresaIdLogada());
     }
 
     @Transactional
     public Movimentacao registrarViaPDV(MovimentacaoPdvDTO dto) {
         Long empresaId = getEmpresaIdLogada(); // Usa a sua função segura do JWT
+        if (dto == null || dto.getQuantidade() == null || dto.getQuantidade() <= 0) {
+            throw new RegraNegocioException("A quantidade deve ser maior que zero.");
+        }
 
-       
         Produto produto = produtoRepository.buscarPorCodigoBarrasComLockParaAtualizacao(dto.getCodigoBarras(), empresaId)
                 .orElseThrow(() -> new RuntimeException("Produto com código " + dto.getCodigoBarras() + " não encontrado no seu estoque."));
 
-
-        
         TipoMovimentacao tipo;
         try {
             tipo = TipoMovimentacao.valueOf(dto.getTipo().toUpperCase());
@@ -80,8 +84,10 @@ public class MovimentacaoService {
             if (produto.getQuantidade() < dto.getQuantidade()) {
                 throw new RuntimeException("Estoque insuficiente! Você tentou vender " + dto.getQuantidade() + " mas só tem " + produto.getQuantidade() + " de " + produto.getNome());
             }
+            loteEstoqueService.baixar(produto, dto.getQuantidade());
             produto.setQuantidade(produto.getQuantidade() - dto.getQuantidade());
         } else if (tipo == TipoMovimentacao.ENTRADA) {
+            loteEstoqueService.registrarEntrada(produto, dto.getQuantidade());
             produto.setQuantidade(produto.getQuantidade() + dto.getQuantidade());
         } else {
             throw new RuntimeException("Tipo de movimentação inválido para o PDV. Use ENTRADA ou SAIDA.");

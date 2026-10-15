@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.smartstock.backend.repository.MovimentacaoRepository;
+import com.smartstock.backend.repository.LoteRepository;
 import org.junit.jupiter.api.AfterEach;
 /**
  * Cobre o fluxo mais sensível a dinheiro do sistema: uma venda errada no
@@ -48,6 +49,9 @@ class PdvFluxoIntegrationTest extends IntegrationTestBase {
 
     @Autowired
     private MovimentacaoRepository movimentacaoRepository;
+
+    @Autowired
+    private LoteRepository loteRepository;
 
     private Empresa empresa;
     private Produto produto;
@@ -75,6 +79,7 @@ class PdvFluxoIntegrationTest extends IntegrationTestBase {
     @AfterEach
     void limparDados() {
     movimentacaoRepository.deleteAll();
+    loteRepository.deleteAll();
     usuarioRepository.deleteAll();
     produtoRepository.deleteAll();
     empresaRepository.deleteAll();

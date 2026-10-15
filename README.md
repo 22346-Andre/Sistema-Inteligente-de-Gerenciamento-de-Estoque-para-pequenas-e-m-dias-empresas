@@ -40,7 +40,7 @@ O **SmartStock** é um sistema de Planejamento de Recursos Empresariais (ERP) fo
 ## 💻 Tecnologias Utilizadas
 
 ### Backend
-* **Java 25**
+* **Java 21** (imagem de execução Docker: Java 25)
 * **Spring Boot 3.5** (Web, Data JPA, Security, Validation, Mail, Async, Scheduling)
 * **Spring Security + OAuth2 Resource Server** — autenticação stateless via JWT (par de chaves RSA)
 * **MySQL 8** — banco relacional gerenciado (Aiven Cloud)
@@ -89,7 +89,7 @@ Toda entidade de negócio referencia uma `Empresa`. O `empresaId` vem exclusivam
 ## 🚀 Rodando o projeto localmente
 
 ### Pré-requisitos
-* JDK 25
+* JDK 21 ou superior
 * Maven 3.9+
 * Uma instância MySQL 8 acessível
 
@@ -112,7 +112,7 @@ Defina as seguintes variáveis de ambiente (ou um arquivo `.env` / `application-
 ```bash
 # 1. Clone o repositório
 git clone https://github.com/22346-Andre/Sistema-Inteligente-de-Gerenciamento-de-Estoque-para-pequenas-e-m-dias-empresas.git
-cd Sistema-Inteligente-de-Gerenciamento-de-Estoque-para-pequenas-e-m-dias-empresas/backend/backend
+cd Sistema-Inteligente-de-Gerenciamento-de-Estoque-para-pequenas-e-m-dias-empresas/backend
 
 # 2. Configure as variáveis de ambiente (ver tabela acima)
 

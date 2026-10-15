@@ -8,6 +8,9 @@ import com.smartstock.backend.model.Fornecedor;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.FornecedorRepository;
 import com.smartstock.backend.repository.ProdutoRepository;
+import com.smartstock.backend.repository.LoteRepository;
+import com.smartstock.backend.repository.MovimentacaoRepository;
+import com.smartstock.backend.repository.UsuarioRepository;
 import com.smartstock.backend.repository.DespesaRepository;
 import com.smartstock.backend.service.DespesaService;
 import com.smartstock.backend.service.ProdutoService;
@@ -37,6 +40,9 @@ class FornecedorIsolamentoIntegrationTest extends IntegrationTestBase {
     @Autowired private EmpresaRepository empresaRepository;
     @Autowired private FornecedorRepository fornecedorRepository;
     @Autowired private ProdutoRepository produtoRepository;
+    @Autowired private LoteRepository loteRepository;
+    @Autowired private MovimentacaoRepository movimentacaoRepository;
+    @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private DespesaRepository despesaRepository;
     @Autowired private ProdutoService produtoService;
     @Autowired private DespesaService despesaService;
@@ -61,8 +67,11 @@ class FornecedorIsolamentoIntegrationTest extends IntegrationTestBase {
     void limpar() {
         SecurityContextHolder.clearContext();
         despesaRepository.deleteAll();
+        movimentacaoRepository.deleteAll();
+        loteRepository.deleteAll();
         produtoRepository.deleteAll();
         fornecedorRepository.deleteAll();
+        usuarioRepository.deleteAll();
         empresaRepository.deleteAll();
     }
 

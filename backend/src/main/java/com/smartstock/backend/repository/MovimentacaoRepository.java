@@ -2,6 +2,8 @@ package com.smartstock.backend.repository;
 
 import com.smartstock.backend.model.Movimentacao;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -32,6 +34,12 @@ public interface MovimentacaoRepository extends JpaRepository<Movimentacao, Long
     Integer sumSaidasUltimosDias(@Param("empresaId") Long empresaId, @Param("dataInicio") java.time.LocalDateTime dataInicio);
 
     List<Movimentacao> findByProdutoIdOrderByDataMovimentacaoDesc(Long produtoId);
+
+    @Query("SELECT m FROM Movimentacao m WHERE m.produto.id = :produtoId " +
+            "AND m.produto.empresa.id = :empresaId ORDER BY m.dataMovimentacao DESC")
+    List<Movimentacao> findByProdutoIdAndEmpresaIdOrderByDataMovimentacaoDesc(
+            @Param("produtoId") Long produtoId,
+            @Param("empresaId") Long empresaId);
 
     // Usado para checar se um produto tem histórico antes de permitir excluí-lo
     boolean existsByProdutoId(Long produtoId);
