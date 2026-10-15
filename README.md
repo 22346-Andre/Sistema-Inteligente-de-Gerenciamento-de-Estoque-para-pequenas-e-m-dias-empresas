@@ -31,6 +31,7 @@ O **SmartStock** é um sistema de Planejamento de Recursos Empresariais (ERP) fo
 * 🏢 **SaaS Multi-Tenant:** base de dados unificada com isolamento lógico por empresa (`empresaId`), extraído do token JWT — nunca aceito como parâmetro livre do cliente.
 * 🔐 **Autenticação JWT (RS256)** com Spring Security, login social via **Google OAuth2**, recuperação de senha por e-mail (token de uso único, validade de 1h) e **rate limiting** contra força bruta no login (bloqueio após 5 tentativas falhas).
 * 🔒 **Concorrência segura:** baixa de estoque protegida por bloqueio pessimista (`SELECT ... FOR UPDATE`), evitando estoque negativo em vendas simultâneas do mesmo produto.
+* 🔁 **Webhooks idempotentes:** reentregas do mesmo pedido/canal não repetem a baixa de estoque; itens duplicados do mesmo produto são somados.
 * 🗄️ **Migrações versionadas com Flyway:** todo o histórico de alterações estruturais do banco é rastreável e reproduzível.
 * ✉️ **E-mail transacional via API HTTP (Brevo):** evita a instabilidade/bloqueio de portas SMTP comum em plataformas de hospedagem.
 * 🔌 **Webhooks:** recebimento de payloads de plataformas de e-commerce para baixa automática de estoque, validados por assinatura secreta exclusiva por empresa.
@@ -163,6 +164,10 @@ src/main/resources/
 | `GET` | `/sugestoes-compra` | Lista de reposição sugerida, com urgência calculada |
 | `POST` | `/pix/gerar` | Gera cobrança PIX (Copia e Cola) |
 | `GET` | `/fiados/{id}/whatsapp` | Gera link de cobrança via WhatsApp |
+
+### Contrato de webhook de vendas
+
+`POST /api/webhooks/vendas` exige o cabeçalho `X-Webhook-Secret` e um corpo com `origem`, `idPedido` e `itens`. Cada item precisa informar `codigoBarras` e uma `quantidade` positiva. O backend usa empresa + origem + ID do pedido + código do produto para evitar baixas duplicadas, inclusive quando a plataforma reenvia um webhook após timeout. Linhas repetidas do mesmo produto são somadas antes da baixa.
 
 ---
 

@@ -16,6 +16,7 @@ import java.util.List;
 public class VendaExternaResultadoDTO {
     private String chaveVendaExterna;
     private int itensProcessados;
+    private int itensJaProcessados;
     private int itensComFalha;
     private List<String> falhas = new ArrayList<>();
 

@@ -4,6 +4,7 @@ import com.smartstock.backend.dto.VendaExternaDTO;
 import com.smartstock.backend.dto.VendaExternaResultadoDTO;
 import com.smartstock.backend.model.Empresa;
 import com.smartstock.backend.service.WebhookService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,7 +30,7 @@ public class WebhookController {
 
     @PostMapping("/vendas")
     public ResponseEntity<?> receberVendaExterna(
-            @RequestBody VendaExternaDTO dto,
+            @Valid @RequestBody VendaExternaDTO dto,
             @RequestHeader(value = "X-Webhook-Secret", required = false) String segredoRecebido) {
 
        

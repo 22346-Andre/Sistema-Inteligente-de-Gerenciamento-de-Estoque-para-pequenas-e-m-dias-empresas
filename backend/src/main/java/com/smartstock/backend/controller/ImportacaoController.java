@@ -10,6 +10,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
@@ -17,6 +19,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/importacao")
 public class ImportacaoController {
+
+    private static final Logger logger = LoggerFactory.getLogger(ImportacaoController.class);
 
     private final ImportacaoService importacaoService;
 
@@ -44,9 +48,9 @@ public class ImportacaoController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Falha interna ao importar arquivo CSV.", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Erro interno ao processar o CSV: " + e.getMessage());
+                    .body("Erro interno ao processar o CSV. Tente novamente ou contate o suporte.");
         }
     }
 
@@ -63,7 +67,9 @@ public class ImportacaoController {
 
         MultipartFile arquivoParaProcessar = ficheiro != null ? ficheiro : file;
 
-        if (arquivoParaProcessar == null || arquivoParaProcessar.isEmpty() || !arquivoParaProcessar.getOriginalFilename().toLowerCase().endsWith(".xml")) {
+        if (arquivoParaProcessar == null || arquivoParaProcessar.isEmpty()
+                || arquivoParaProcessar.getOriginalFilename() == null
+                || !arquivoParaProcessar.getOriginalFilename().toLowerCase().endsWith(".xml")) {
             return ResponseEntity.badRequest().body("Erro: Envie um arquivo XML válido.");
         }
 
@@ -87,10 +93,12 @@ public class ImportacaoController {
             return ResponseEntity.ok(relatorio);
         } catch (NotaFiscalDuplicadaException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Falha interna ao importar arquivo XML.", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Erro interno ao processar o XML: " + e.getMessage());
+                    .body("Erro interno ao processar o XML. Tente novamente ou contate o suporte.");
         }
     }
 }

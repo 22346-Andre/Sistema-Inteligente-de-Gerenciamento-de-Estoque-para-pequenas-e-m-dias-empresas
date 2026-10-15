@@ -3,38 +3,41 @@ package com.smartstock.backend.service;
 import com.smartstock.backend.dto.ItemVendaExternaDTO;
 import com.smartstock.backend.dto.VendaExternaDTO;
 import com.smartstock.backend.dto.VendaExternaResultadoDTO;
+import com.smartstock.backend.exception.EstoqueInsuficienteException;
+import com.smartstock.backend.exception.RegraNegocioException;
+import com.smartstock.backend.exception.RecursoNaoEncontradoException;
 import com.smartstock.backend.model.Empresa;
 import com.smartstock.backend.model.Notificacao;
-import com.smartstock.backend.model.Produto;
-import com.smartstock.backend.model.TipoMovimentacao;
 import com.smartstock.backend.repository.EmpresaRepository;
 import com.smartstock.backend.repository.NotificacaoRepository;
-import com.smartstock.backend.repository.ProdutoRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 public class WebhookService {
 
     private static final Logger logger = LoggerFactory.getLogger(WebhookService.class);
 
-    private final ProdutoRepository produtoRepository;
     private final EmpresaRepository empresaRepository;
     private final NotificacaoRepository notificacaoRepository;
-    private final ProdutoService produtoService;
+    private final WebhookItemService webhookItemService;
 
-    public WebhookService(ProdutoRepository produtoRepository,
-                           EmpresaRepository empresaRepository,
+    public WebhookService(EmpresaRepository empresaRepository,
                            NotificacaoRepository notificacaoRepository,
-                           ProdutoService produtoService) {
-        this.produtoRepository = produtoRepository;
+                           WebhookItemService webhookItemService) {
         this.empresaRepository = empresaRepository;
         this.notificacaoRepository = notificacaoRepository;
-        this.produtoService = produtoService;
+        this.webhookItemService = webhookItemService;
     }
 
     // --------------------------------------------------------------------
@@ -58,66 +61,107 @@ public class WebhookService {
     // notificação persistida, não um log que só o desenvolvedor vê.
     // --------------------------------------------------------------------
     public VendaExternaResultadoDTO processarVendaExterna(VendaExternaDTO dto, Empresa empresa) {
-        VendaExternaResultadoDTO resultado = new VendaExternaResultadoDTO();
+        validarPayload(dto);
 
-        // Chave única que agrupa todos os itens desta venda externa no
-        // histórico de movimentações (limitada a 44 caracteres, mesma regra
-        // de antes).
-        String chaveVendaExterna = "WEBHOOK-" + UUID.randomUUID().toString().replace("-", "").substring(0, 20).toUpperCase();
+        String origem = dto.getOrigem().trim().toUpperCase();
+        String pedidoId = dto.getIdPedido().trim();
+        String chaveVendaExterna = gerarChaveVendaExterna(empresa.getId(), origem, pedidoId);
+        VendaExternaResultadoDTO resultado = new VendaExternaResultadoDTO();
         resultado.setChaveVendaExterna(chaveVendaExterna);
 
-        if (dto.getItens() == null || dto.getItens().isEmpty()) {
-            logger.warn("Webhook: payload da empresa {} (id={}) chegou sem itens.", empresa.getNomeFantasia(), empresa.getId());
-            return resultado;
-        }
-
-        for (ItemVendaExternaDTO item : dto.getItens()) {
+        for (ItemVendaExternaDTO item : agruparItens(dto)) {
             try {
-                processarItemEmTransacaoPropria(item, empresa, dto.getOrigem(), chaveVendaExterna);
-                resultado.setItensProcessados(resultado.getItensProcessados() + 1);
+                boolean processadoAgora = processarItemEmTransacaoPropria(
+                        item, empresa, origem, pedidoId, chaveVendaExterna);
+                if (processadoAgora) {
+                    resultado.setItensProcessados(resultado.getItensProcessados() + 1);
+                } else {
+                    resultado.setItensJaProcessados(resultado.getItensJaProcessados() + 1);
+                }
 
+            } catch (DataIntegrityViolationException e) {
+                // A restrição única protege também contra duas entregas simultâneas
+                // que passaram pela verificação anterior ao INSERT.
+                if (webhookItemService.jaProcessado(
+                        empresa.getId(), origem, pedidoId, item.getCodigoBarras().trim())) {
+                    resultado.setItensJaProcessados(resultado.getItensJaProcessados() + 1);
+                    continue;
+                }
+                registrarFalha(dto, empresa, item, chaveVendaExterna, e, resultado);
             } catch (Exception e) {
-                // Sem silêncio: além do log técnico (pro desenvolvedor), grava
-                // uma notificação PERSISTIDA (pro gestor ver dentro do sistema)
-                // e reporta o item na resposta HTTP (pro canal externo, se ele
-                // quiser mostrar isso também). A falha de 1 item nunca derruba
-                // os outros nem quebra a resposta HTTP.
-                String motivoFalha = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-
-                logger.error("Webhook: falha ao processar item '{}' da venda externa {} (empresa id={}): {}",
-                        item.getCodigoBarras(), chaveVendaExterna, empresa.getId(), motivoFalha);
-
-                registrarNotificacaoFalhaParcial(empresa, dto, chaveVendaExterna, item, motivoFalha);
-                resultado.adicionarFalha(item.getCodigoBarras(), motivoFalha);
+                registrarFalha(dto, empresa, item, chaveVendaExterna, e, resultado);
             }
         }
 
         return resultado;
     }
 
-    // Cada item roda isolado: se o item 2 falhar, isso não desfaz o item 1
-    // que já tinha sido salvo com sucesso. A transação de verdade que
-    // garante isso é a de ProdutoService.registrarSaidaComEmpresa (chamada
-    // logo abaixo) — como é uma chamada entre BEANS diferentes (WebhookService
-    // → ProdutoService), passa pelo proxy do Spring normalmente. Não colocamos
-    // @Transactional aqui nesta classe porque, se colocássemos, essa
-    // chamada seria feita de dentro da MESMA classe (self-invocation) — o
-    // Spring simplesmente ignora a anotação nesse caso, então a anotação
-    // aqui seria só um comentário disfarçado de proteção real.
-    private void processarItemEmTransacaoPropria(ItemVendaExternaDTO item, Empresa empresa, String origem, String chaveVendaExterna) {
-        Produto produto = produtoRepository.findByCodigoBarrasAndEmpresaId(item.getCodigoBarras(), empresa.getId())
-                .orElseThrow(() -> new RuntimeException("Produto não encontrado no seu catálogo (código: " + item.getCodigoBarras() + ")"));
+    private java.util.List<ItemVendaExternaDTO> agruparItens(VendaExternaDTO dto) {
+        Map<String, Integer> quantidadesPorCodigo = new LinkedHashMap<>();
+        for (ItemVendaExternaDTO item : dto.getItens()) {
+            String codigo = item.getCodigoBarras().trim();
+            try {
+                quantidadesPorCodigo.merge(codigo, item.getQuantidade(), Math::addExact);
+            } catch (ArithmeticException e) {
+                throw new IllegalArgumentException("A quantidade total de um produto excede o limite permitido.", e);
+            }
+        }
 
-       
-        produtoService.registrarSaidaComEmpresa(
-                produto.getId(),
-                item.getQuantidade(),
-                TipoMovimentacao.SAIDA,
-                "Venda Externa: " + origem,
-                chaveVendaExterna,
-                null, //  venda externa via Webhook não tem forma de pagamento capturada no PDV
-                empresa.getId()
-        );
+        return quantidadesPorCodigo.entrySet().stream().map(entrada -> {
+            ItemVendaExternaDTO item = new ItemVendaExternaDTO();
+            item.setCodigoBarras(entrada.getKey());
+            item.setQuantidade(entrada.getValue());
+            return item;
+        }).toList();
+    }
+
+    private void registrarFalha(VendaExternaDTO dto, Empresa empresa, ItemVendaExternaDTO item,
+                                String chaveVendaExterna, Exception erro, VendaExternaResultadoDTO resultado) {
+        String motivoFalha = erro instanceof RecursoNaoEncontradoException
+                || erro instanceof EstoqueInsuficienteException
+                || erro instanceof RegraNegocioException
+                || erro instanceof IllegalArgumentException
+                || erro instanceof IllegalStateException
+                ? erro.getMessage()
+                : "Falha interna ao processar o item. Tente novamente.";
+
+        logger.error("Webhook: falha ao processar item '{}' da venda externa {} (empresa id={})",
+                item.getCodigoBarras(), chaveVendaExterna, empresa.getId(), erro);
+
+        registrarNotificacaoFalhaParcial(empresa, dto, chaveVendaExterna, item, motivoFalha);
+        resultado.adicionarFalha(item.getCodigoBarras(), motivoFalha);
+    }
+
+    private void validarPayload(VendaExternaDTO dto) {
+        if (dto == null || dto.getOrigem() == null || dto.getOrigem().isBlank()
+                || dto.getIdPedido() == null || dto.getIdPedido().isBlank()
+                || dto.getItens() == null || dto.getItens().isEmpty()) {
+            throw new IllegalArgumentException("Origem, ID do pedido e ao menos um item são obrigatórios.");
+        }
+
+        for (ItemVendaExternaDTO item : dto.getItens()) {
+            if (item == null || item.getCodigoBarras() == null || item.getCodigoBarras().isBlank()
+                    || item.getQuantidade() == null || item.getQuantidade() <= 0) {
+                throw new IllegalArgumentException("Cada item deve informar código de barras e quantidade maior que zero.");
+            }
+        }
+    }
+
+    private boolean processarItemEmTransacaoPropria(ItemVendaExternaDTO item, Empresa empresa,
+                                                     String origem, String pedidoId,
+                                                     String chaveVendaExterna) {
+        return webhookItemService.processar(empresa, origem, pedidoId,
+                item.getCodigoBarras().trim(), item.getQuantidade(), chaveVendaExterna);
+    }
+
+    private String gerarChaveVendaExterna(Long empresaId, String origem, String pedidoId) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(
+                    (empresaId + "|" + origem + "|" + pedidoId).getBytes(StandardCharsets.UTF_8));
+            return "WEBHOOK-" + HexFormat.of().formatHex(digest).substring(0, 32).toUpperCase();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 indisponível para gerar a chave do pedido.", e);
+        }
     }
 
     private void registrarNotificacaoFalhaParcial(Empresa empresa, VendaExternaDTO dto, String chaveVendaExterna,

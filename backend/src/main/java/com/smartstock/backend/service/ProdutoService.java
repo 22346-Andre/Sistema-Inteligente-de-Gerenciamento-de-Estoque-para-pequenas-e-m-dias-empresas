@@ -1,6 +1,7 @@
 package com.smartstock.backend.service;
 
 import com.smartstock.backend.exception.AcessoNegadoException;
+import com.smartstock.backend.exception.EstoqueInsuficienteException;
 import com.smartstock.backend.exception.RecursoNaoEncontradoException;
 
 import com.smartstock.backend.dto.LoteAlertaDTO;
@@ -62,12 +63,18 @@ public class ProdutoService {
     // 🆕 Quem está logado agora — pra carimbar em cada Movimentacao/venda quem
     // fez (a que horas já vem de graça, é a dataMovimentacao).
     private Long getUsuarioIdLogado() {
-        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof Jwt jwt)) {
+            return null;
+        }
         return jwt.getClaim("id");
     }
 
     private String getUsuarioNomeLogado() {
-        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof Jwt jwt)) {
+            return "Integração externa";
+        }
         return jwt.getClaim("nome");
     }
 
@@ -440,7 +447,7 @@ public class ProdutoService {
         }
 
         if (produto.getQuantidade() < quantidadeDesejada) {
-            throw new RuntimeException("Estoque insuficiente! Saldo atual: " + produto.getQuantidade());
+            throw new EstoqueInsuficienteException("Estoque insuficiente! Saldo atual: " + produto.getQuantidade());
         }
 
         loteEstoqueService.baixar(produto, quantidadeDesejada);

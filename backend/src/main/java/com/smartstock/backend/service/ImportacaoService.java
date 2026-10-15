@@ -32,7 +32,9 @@ import org.springframework.web.multipart.MultipartFile;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.BufferedReader;
@@ -293,7 +295,19 @@ public class ImportacaoService {
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             factory.setNamespaceAware(true);
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            factory.setXIncludeAware(false);
+            factory.setExpandEntityReferences(false);
+            factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+            factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
             DocumentBuilder builder = factory.newDocumentBuilder();
+            builder.setEntityResolver((publicId, systemId) -> {
+                throw new SAXException("Referências externas não são permitidas no XML.");
+            });
             Document doc = builder.parse(file.getInputStream());
             doc.getDocumentElement().normalize();
 
@@ -376,7 +390,8 @@ public class ImportacaoService {
                 produtosEncontrados.add(produto);
             }
         } catch (Exception e) {
-            throw new RuntimeException("Erro ao ler o XML da Nota Fiscal: Certifique-se que é uma NF-e válida da SEFAZ.");
+            throw new IllegalArgumentException(
+                    "Erro ao ler o XML da Nota Fiscal. Certifique-se de que é uma NF-e válida da SEFAZ.", e);
         }
 
         notaFiscalInfo.put("quantidadeItens", produtosEncontrados.size());
