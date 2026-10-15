@@ -18,13 +18,18 @@ import com.smartstock.backend.service.RegistroService;
 import com.smartstock.backend.service.TokenService;
 import com.smartstock.backend.service.VerificacaoCadastroService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @RestController
@@ -60,6 +65,11 @@ public class AuthController {
 
     @Autowired
     private EmailService emailService;
+
+    @GetMapping("/csrf")
+    public ResponseEntity<String> csrf(CsrfToken csrfToken) {
+        return ResponseEntity.ok(csrfToken.getToken());
+    }
 
     
     @PostMapping("/registrar-empresa")
@@ -107,7 +117,9 @@ public class AuthController {
 
     // --- ROTA DE LOGIN NORMAL ---
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest loginRequest, HttpServletRequest request) {
+    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest loginRequest,
+                                               HttpServletRequest request,
+                                               HttpServletResponse response) {
 
         String ip = extrairIpCliente(request);
 
@@ -132,12 +144,15 @@ public class AuthController {
         var jwtValue = tokenService.gerarToken(user);
         var expiresIn = 3600L;
 
+        definirCookieAcesso(response, jwtValue, expiresIn);
         return ResponseEntity.ok(new LoginResponse(jwtValue, expiresIn));
     }
 
 
     @PostMapping("/login/google")
-    public ResponseEntity<?> loginComGoogle(@RequestBody GoogleLoginDTO dto, HttpServletRequest request) {
+    public ResponseEntity<?> loginComGoogle(@RequestBody GoogleLoginDTO dto,
+                                            HttpServletRequest request,
+                                            HttpServletResponse response) {
         // O login por senha tem seu próprio limite (email+IP, email, IP); aqui só cabe
         // o de IP, já que não há "e-mail digitado" antes de verificar o token do Google.
         String ip = extrairIpCliente(request);
@@ -147,12 +162,39 @@ public class AuthController {
             String jwtValue = authService.loginComGoogle(dto.getToken());
             var expiresIn = 3600L;
 
+            definirCookieAcesso(response, jwtValue, expiresIn);
             // Devolvemos exatamente no mesmo formato do login normal!
             return ResponseEntity.ok(new LoginResponse(jwtValue, expiresIn));
         } catch (RuntimeException e) {
             loginAttemptService.registrarFalhaIp(ip);
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(HttpServletResponse response) {
+        ResponseCookie cookie = ResponseCookie.from("access_token", "")
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(Duration.ZERO)
+                .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        return ResponseEntity.noContent().build();
+    }
+
+    private void definirCookieAcesso(HttpServletResponse response, String token, long expiresIn) {
+        ResponseCookie cookie = ResponseCookie.from("access_token", token)
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(Duration.ofSeconds(expiresIn))
+                .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
    
