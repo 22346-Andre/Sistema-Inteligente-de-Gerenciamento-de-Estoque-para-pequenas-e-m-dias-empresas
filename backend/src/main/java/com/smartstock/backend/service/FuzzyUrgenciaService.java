@@ -2,6 +2,8 @@ package com.smartstock.backend.service;
 
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class FuzzyUrgenciaService {
 
@@ -35,6 +37,79 @@ public class FuzzyUrgenciaService {
     private static final double UNIVERSO_MAX = 100;
     private static final double PASSO = 0.5; // resolução da discretização para o COG
 
+    // ---------------------------------------------------------
+    // Termos linguísticos e base de regras
+    // ---------------------------------------------------------
+
+    enum Estoque { BAIXO, ADEQUADO, ALTO }
+    enum Giro { LENTO, MODERADO, RAPIDO }
+    enum Prazo { RAPIDO, ACEITAVEL, DEMORADO }
+    enum Urgencia { NULA, BAIXA, MEDIA, ALTA }
+
+    /** SE estoque É x E giro É y E prazo É z ENTÃO urgência É w. */
+    record Regra(Estoque estoque, Giro giro, Prazo prazo, Urgencia urgencia) { }
+
+    /**
+     * Base de regras COMPLETA: 3 termos de estoque x 3 de giro x 3 de prazo = 27 regras,
+     * uma para cada combinação possível das entradas (nenhuma combinação fica sem regra).
+     *
+     * Critérios usados para definir a urgência de cada combinação:
+     *  - Estoque BAIXO (abaixo do mínimo): a urgência cresce com o giro (quanto mais vende,
+     *    mais rápido falta) e com o prazo (entrega demorada exige antecedência).
+     *    Prazo DEMORADO com estoque baixo é sempre ALTA, qualquer que seja o giro.
+     *    Giro RÁPIDO com estoque baixo é sempre ALTA, mesmo com entrega rápida: o produto
+     *    pode acabar antes de o giro ser percebido.
+     *  - Estoque ADEQUADO (próximo ao mínimo, até 200%): o colchão de estoque absorve a
+     *    entrega, então só o giro decide (rápido = MÉDIA, moderado = BAIXA, lento = NULA).
+     *  - Estoque ALTO (acima de 150-200% do mínimo): NULA, qualquer que seja o giro e o prazo.
+     *
+     *                          prazo RÁPIDO   prazo ACEITÁVEL   prazo DEMORADO
+     *   BAIXO    giro LENTO       BAIXA          BAIXA            ALTA
+     *            giro MODERADO    MÉDIA          MÉDIA            ALTA
+     *            giro RÁPIDO      ALTA           ALTA             ALTA
+     *   ADEQUADO giro LENTO       NULA           NULA             NULA
+     *            giro MODERADO    BAIXA          BAIXA            BAIXA
+     *            giro RÁPIDO      MÉDIA          MÉDIA            MÉDIA
+     *   ALTO     (qualquer giro)  NULA           NULA             NULA
+     */
+    static final List<Regra> BASE_DE_REGRAS = List.of(
+            // ---- Estoque BAIXO ----
+            new Regra(Estoque.BAIXO, Giro.LENTO,    Prazo.RAPIDO,    Urgencia.BAIXA),  // R01
+            new Regra(Estoque.BAIXO, Giro.LENTO,    Prazo.ACEITAVEL, Urgencia.BAIXA),  // R02
+            new Regra(Estoque.BAIXO, Giro.LENTO,    Prazo.DEMORADO,  Urgencia.ALTA),   // R03
+            new Regra(Estoque.BAIXO, Giro.MODERADO, Prazo.RAPIDO,    Urgencia.MEDIA),  // R04
+            new Regra(Estoque.BAIXO, Giro.MODERADO, Prazo.ACEITAVEL, Urgencia.MEDIA),  // R05
+            new Regra(Estoque.BAIXO, Giro.MODERADO, Prazo.DEMORADO,  Urgencia.ALTA),   // R06
+            new Regra(Estoque.BAIXO, Giro.RAPIDO,   Prazo.RAPIDO,    Urgencia.ALTA),   // R07
+            new Regra(Estoque.BAIXO, Giro.RAPIDO,   Prazo.ACEITAVEL, Urgencia.ALTA),   // R08
+            new Regra(Estoque.BAIXO, Giro.RAPIDO,   Prazo.DEMORADO,  Urgencia.ALTA),   // R09
+            // ---- Estoque ADEQUADO ----
+            new Regra(Estoque.ADEQUADO, Giro.LENTO,    Prazo.RAPIDO,    Urgencia.NULA),   // R10
+            new Regra(Estoque.ADEQUADO, Giro.LENTO,    Prazo.ACEITAVEL, Urgencia.NULA),   // R11
+            new Regra(Estoque.ADEQUADO, Giro.LENTO,    Prazo.DEMORADO,  Urgencia.NULA),   // R12
+            new Regra(Estoque.ADEQUADO, Giro.MODERADO, Prazo.RAPIDO,    Urgencia.BAIXA),  // R13
+            new Regra(Estoque.ADEQUADO, Giro.MODERADO, Prazo.ACEITAVEL, Urgencia.BAIXA),  // R14
+            new Regra(Estoque.ADEQUADO, Giro.MODERADO, Prazo.DEMORADO,  Urgencia.BAIXA),  // R15
+            new Regra(Estoque.ADEQUADO, Giro.RAPIDO,   Prazo.RAPIDO,    Urgencia.MEDIA),  // R16
+            new Regra(Estoque.ADEQUADO, Giro.RAPIDO,   Prazo.ACEITAVEL, Urgencia.MEDIA),  // R17
+            new Regra(Estoque.ADEQUADO, Giro.RAPIDO,   Prazo.DEMORADO,  Urgencia.MEDIA),  // R18
+            // ---- Estoque ALTO ----
+            new Regra(Estoque.ALTO, Giro.LENTO,    Prazo.RAPIDO,    Urgencia.NULA),  // R19
+            new Regra(Estoque.ALTO, Giro.LENTO,    Prazo.ACEITAVEL, Urgencia.NULA),  // R20
+            new Regra(Estoque.ALTO, Giro.LENTO,    Prazo.DEMORADO,  Urgencia.NULA),  // R21
+            new Regra(Estoque.ALTO, Giro.MODERADO, Prazo.RAPIDO,    Urgencia.NULA),  // R22
+            new Regra(Estoque.ALTO, Giro.MODERADO, Prazo.ACEITAVEL, Urgencia.NULA),  // R23
+            new Regra(Estoque.ALTO, Giro.MODERADO, Prazo.DEMORADO,  Urgencia.NULA),  // R24
+            new Regra(Estoque.ALTO, Giro.RAPIDO,   Prazo.RAPIDO,    Urgencia.NULA),  // R25
+            new Regra(Estoque.ALTO, Giro.RAPIDO,   Prazo.ACEITAVEL, Urgencia.NULA),  // R26
+            new Regra(Estoque.ALTO, Giro.RAPIDO,   Prazo.DEMORADO,  Urgencia.NULA)   // R27
+    );
+
+    /** Funções de pertinência da saída, na ordem do enum Urgencia (NULA, BAIXA, MEDIA, ALTA). */
+    private static final double[][][] URGENCIA_FUNCOES = {
+            URGENCIA_NULA, URGENCIA_BAIXA, URGENCIA_MEDIA, URGENCIA_ALTA
+    };
+
     /**
      * Calcula o grau de pertinência (0 a 1) de x numa função linear por partes.
      * Fora do intervalo definido, assume o valor da extremidade mais próxima.
@@ -57,46 +132,45 @@ public class FuzzyUrgenciaService {
     }
 
     /**
-     * Avalia a urgência de compra (0 a 100) para um produto, usando as mesmas
-     * regras fuzzy que tínhamos no FCL, agora resolvidas em Java puro.
+     * Avalia a urgência de compra (0 a 100) para um produto, usando a base completa de
+     * 27 regras (ver BASE_DE_REGRAS), inferência de Mamdani (AND = mínimo, agregação = máximo)
+     * e defuzzificação por centro de gravidade.
      */
     public double calcularUrgencia(double nivelEstoquePct, double giroVendas, double prazoEntregaDias) {
         double nivel = Math.max(0, nivelEstoquePct);
         double giro = Math.max(0, giroVendas);
         double prazo = Math.max(0, prazoEntregaDias);
 
-        // --- Fuzzificação das entradas ---
-        double estBaixo = pertinencia(nivel, ESTOQUE_BAIXO);
-        double estAdequado = pertinencia(nivel, ESTOQUE_ADEQUADO);
-        double estAlto = pertinencia(nivel, ESTOQUE_ALTO);
+        // --- Fuzzificação das entradas (índices na ordem dos enums) ---
+        double[] mEstoque = {
+                pertinencia(nivel, ESTOQUE_BAIXO),
+                pertinencia(nivel, ESTOQUE_ADEQUADO),
+                pertinencia(nivel, ESTOQUE_ALTO)
+        };
+        double[] mGiro = {
+                pertinencia(giro, GIRO_LENTO),
+                pertinencia(giro, GIRO_MODERADO),
+                pertinencia(giro, GIRO_RAPIDO)
+        };
+        double[] mPrazo = {
+                pertinencia(prazo, PRAZO_RAPIDO),
+                pertinencia(prazo, PRAZO_ACEITAVEL),
+                pertinencia(prazo, PRAZO_DEMORADO)
+        };
 
-        double giroLento = pertinencia(giro, GIRO_LENTO);
-        double giroModerado = pertinencia(giro, GIRO_MODERADO);
-        double giroRapido = pertinencia(giro, GIRO_RAPIDO);
+        // --- Avaliação das 27 regras (AND = MIN) e agregação por termo de saída (ACCU = MAX) ---
+        double[] forca = new double[Urgencia.values().length];
+        for (Regra r : BASE_DE_REGRAS) {
+            double f = Math.min(mEstoque[r.estoque().ordinal()],
+                    Math.min(mGiro[r.giro().ordinal()], mPrazo[r.prazo().ordinal()]));
+            int saida = r.urgencia().ordinal();
+            forca[saida] = Math.max(forca[saida], f);
+        }
 
-        double prazoRapido = pertinencia(prazo, PRAZO_RAPIDO);
-        double prazoAceitavel = pertinencia(prazo, PRAZO_ACEITAVEL);
-        double prazoDemorado = pertinencia(prazo, PRAZO_DEMORADO);
-
-        // --- Avaliação das regras (AND = MIN) ---
-        double r1 = Math.min(estBaixo, Math.min(giroRapido, prazoDemorado));   // -> alta
-        double r2 = Math.min(estBaixo, Math.min(giroRapido, prazoAceitavel));  // -> alta
-        double r3 = Math.min(estBaixo, giroModerado);                          // -> media
-        double r4 = Math.min(estBaixo, giroLento);                             // -> baixa
-        double r5 = Math.min(estAdequado, giroRapido);                         // -> media
-        double r6 = Math.min(estAdequado, giroModerado);                       // -> baixa
-        double r7 = Math.min(estAdequado, giroLento);                          // -> nula
-        double r8 = estAlto;                                                   // -> nula
-        double r9 = Math.min(estBaixo, prazoDemorado);                         // -> alta
-
-        // --- Agregação por termo de saída (ACCU = MAX) ---
-        double forcaAlta  = Math.max(r1, Math.max(r2, r9));
-        double forcaMedia = Math.max(r3, r5);
-        double forcaBaixa = Math.max(r4, r6);
-        double forcaNula  = Math.max(r7, r8);
-
-        // Se nenhuma regra disparou, urgência é 0 (equivalente ao DEFAULT do FCL)
-        if (forcaAlta == 0 && forcaMedia == 0 && forcaBaixa == 0 && forcaNula == 0) {
+        // Com a base completa sempre dispara ao menos uma regra; a checagem abaixo é só uma salvaguarda.
+        double forcaTotal = 0;
+        for (double f : forca) forcaTotal = Math.max(forcaTotal, f);
+        if (forcaTotal == 0) {
             return 0.0;
         }
 
@@ -105,13 +179,10 @@ public class FuzzyUrgenciaService {
         double somaMu = 0.0;
 
         for (double x = UNIVERSO_MIN; x <= UNIVERSO_MAX; x += PASSO) {
-            double muAlta  = Math.min(forcaAlta,  pertinencia(x, URGENCIA_ALTA));
-            double muMedia = Math.min(forcaMedia, pertinencia(x, URGENCIA_MEDIA));
-            double muBaixa = Math.min(forcaBaixa, pertinencia(x, URGENCIA_BAIXA));
-            double muNula  = Math.min(forcaNula,  pertinencia(x, URGENCIA_NULA));
-
-            double mu = Math.max(Math.max(muAlta, muMedia), Math.max(muBaixa, muNula));
-
+            double mu = 0.0;
+            for (int i = 0; i < forca.length; i++) {
+                mu = Math.max(mu, Math.min(forca[i], pertinencia(x, URGENCIA_FUNCOES[i])));
+            }
             somaXMu += x * mu;
             somaMu += mu;
         }
