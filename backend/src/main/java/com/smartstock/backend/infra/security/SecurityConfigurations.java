@@ -25,7 +25,9 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -45,12 +47,15 @@ public class SecurityConfigurations {
     @Value("${cors.allowed-origins:https://frontendrepository-ebon.vercel.app,https://frontendrepository-o4fgcswsg-22346-andres-projects.vercel.app,http://localhost:5173,http://localhost:3000}")
     private String[] corsAllowedOrigins;
 
+    @Value("${app.frontend-url:https://frontendrepository-ebon.vercel.app}")
+    private String frontendUrl;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrfTokenRepository.setCookieCustomizer(cookie -> cookie
                 .secure(true)
-                .sameSite("Lax")
+                .sameSite("None")
                 .path("/"));
 
         http
@@ -128,7 +133,11 @@ public class SecurityConfigurations {
         CorsConfiguration configuration = new CorsConfiguration();
 
 
-        configuration.setAllowedOrigins(Arrays.asList(corsAllowedOrigins));
+        var allowedOrigins = new LinkedHashSet<>(Arrays.asList(corsAllowedOrigins));
+        if (frontendUrl != null && !frontendUrl.isBlank()) {
+            allowedOrigins.add(frontendUrl.trim());
+        }
+        configuration.setAllowedOrigins(new ArrayList<>(allowedOrigins));
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(Arrays.asList(

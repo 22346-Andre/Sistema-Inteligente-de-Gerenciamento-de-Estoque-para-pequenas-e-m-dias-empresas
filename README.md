@@ -106,7 +106,10 @@ Defina as seguintes variáveis de ambiente (ou um arquivo `.env` / `application-
 | `BREVO_API_KEY` | Chave da API de e-mail transacional (Brevo) |
 | `BREVO_SENDER_EMAIL` | E-mail remetente verificado na Brevo |
 | `GOOGLE_CLIENT_ID` | Client ID do OAuth do Google (login social) |
-| `FRONTEND_URL` | URL do frontend, usada para montar links de e-mail (ex.: recuperação de senha) |
+| `FRONTEND_URL` | URL do frontend, usada nos links de e-mail e permitida pelo CORS |
+| `CORS_ALLOWED_ORIGINS` | Lista separada por vírgulas que substitui as origens CORS padrão; `FRONTEND_URL` também é permitida automaticamente |
+
+Em produção com Vercel + Render, configure `FRONTEND_URL` com a origem exata do frontend (por exemplo, `https://frontendrepository-ebon.vercel.app`). Cookies de autenticação e CSRF usam `SameSite=None; Secure`, necessário para chamadas cross-site via HTTPS. Requisições do frontend devem incluir credenciais e enviar `X-XSRF-TOKEN` nas operações mutáveis.
 
 ### Passo a passo
 

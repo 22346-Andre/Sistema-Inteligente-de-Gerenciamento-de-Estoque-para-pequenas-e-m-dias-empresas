@@ -176,7 +176,7 @@ public class AuthController {
         ResponseCookie cookie = ResponseCookie.from("access_token", "")
                 .httpOnly(true)
                 .secure(true)
-                .sameSite("Lax")
+                .sameSite("None")
                 .path("/")
                 .maxAge(Duration.ZERO)
                 .build();
@@ -189,7 +189,7 @@ public class AuthController {
         ResponseCookie cookie = ResponseCookie.from("access_token", token)
                 .httpOnly(true)
                 .secure(true)
-                .sameSite("Lax")
+                .sameSite("None")
                 .path("/")
                 .maxAge(Duration.ofSeconds(expiresIn))
                 .build();
