@@ -172,6 +172,8 @@ src/main/resources/
 
 `POST /api/webhooks/vendas` exige o cabeçalho `X-Webhook-Secret` e um corpo com `origem`, `idPedido` e `itens`. Cada item precisa informar `codigoBarras` e uma `quantidade` positiva. O backend usa empresa + origem + ID do pedido + código do produto para evitar baixas duplicadas, inclusive quando a plataforma reenvia um webhook após timeout. Linhas repetidas do mesmo produto são somadas antes da baixa.
 
+As rotas `/api/webhooks/**` não exigem token CSRF, pois são chamadas por serviços externos. Cada integração valida sua própria credencial: `X-Webhook-Secret` para vendas externas e `DELFINANCE_WEBHOOK_SECRET` no cabeçalho `Authorization` para eventos Pix da Delfinance.
+
 ---
 
 ## 📄 Licença

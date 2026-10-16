@@ -61,6 +61,7 @@ public class SecurityConfigurations {
         http
                 .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf
+                        .ignoringRequestMatchers("/api/webhooks/**")
                         .csrfTokenRepository(csrfTokenRepository)
                         .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
                 .authorizeHttpRequests(auth -> auth

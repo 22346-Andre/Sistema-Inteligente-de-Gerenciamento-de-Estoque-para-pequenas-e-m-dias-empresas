@@ -32,4 +32,23 @@ class CookieBearerTokenResolverTest {
     void returnsNullWhenNoTokenIsPresent() {
         assertNull(resolver.resolve(new MockHttpServletRequest()));
     }
+
+    @Test
+    void ignoresAuthorizationHeaderAndCookieOnPublicRoutes() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setServletPath("/auth/login");
+        request.addHeader("Authorization", "Bearer invalid-token");
+        request.setCookies(new Cookie("access_token", "invalid-cookie"));
+
+        assertNull(resolver.resolve(request));
+    }
+
+    @Test
+    void resolvesAccessCookieOnProtectedRoutes() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setServletPath("/produtos");
+        request.setCookies(new Cookie("access_token", "cookie-token"));
+
+        assertEquals("cookie-token", resolver.resolve(request));
+    }
 }
