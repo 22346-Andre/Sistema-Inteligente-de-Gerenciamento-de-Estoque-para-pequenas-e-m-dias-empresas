@@ -1,6 +1,7 @@
 package com.smartstock.backend.controller;
 
 import com.smartstock.backend.dto.MovimentacaoPdvDTO;
+import com.smartstock.backend.dto.ResumoPerdasDTO;
 import com.smartstock.backend.exception.AcessoNegadoException;
 import com.smartstock.backend.exception.RecursoNaoEncontradoException;
 import com.smartstock.backend.exception.RegraNegocioException;
@@ -25,6 +26,11 @@ public class MovimentacaoController {
     @GetMapping
     public List<Movimentacao> listar() {
         return service.listarTodas();
+    }
+
+    @GetMapping("/perdas/resumo")
+    public ResumoPerdasDTO obterResumoPerdas(@RequestParam(defaultValue = "3") int meses) {
+        return service.obterResumoPerdas(meses);
     }
 
     //

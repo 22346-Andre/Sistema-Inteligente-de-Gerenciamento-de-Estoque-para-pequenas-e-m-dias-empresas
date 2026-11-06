@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface MovimentacaoRepository extends JpaRepository<Movimentacao, Long> {
@@ -145,4 +146,15 @@ Integer sumSaidasPorProdutoUltimosDias(@Param("produtoId") Long produtoId,
            "FROM Movimentacao m WHERE m.empresa.id = :empresaId AND m.tipo = 'QUEBRA_PERDA' " +
            "AND m.dataMovimentacao BETWEEN :inicio AND :fim")
     java.math.BigDecimal somarPerdasNoIntervalo(@Param("empresaId") Long empresaId, @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
+
+    @Query("SELECT YEAR(m.dataMovimentacao), MONTH(m.dataMovimentacao), " +
+           "COALESCE(SUM(m.quantidade * COALESCE(m.produto.precoCusto, 0)), 0) " +
+           "FROM Movimentacao m " +
+           "WHERE m.empresa.id = :empresaId AND m.tipo = 'QUEBRA_PERDA' " +
+           "AND m.dataMovimentacao >= :inicio AND m.dataMovimentacao < :fim " +
+           "GROUP BY YEAR(m.dataMovimentacao), MONTH(m.dataMovimentacao) " +
+           "ORDER BY YEAR(m.dataMovimentacao), MONTH(m.dataMovimentacao)")
+    List<Object[]> somarPerdasPorMes(@Param("empresaId") Long empresaId,
+                                     @Param("inicio") LocalDateTime inicio,
+                                     @Param("fim") LocalDateTime fim);
 }

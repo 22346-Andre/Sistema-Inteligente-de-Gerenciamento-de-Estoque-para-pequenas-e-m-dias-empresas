@@ -13,8 +13,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import com.smartstock.backend.dto.MovimentacaoPdvDTO;
+import com.smartstock.backend.dto.PerdasPorMesDTO;
+import com.smartstock.backend.dto.ResumoPerdasDTO;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.List;
 
 @Service
@@ -61,6 +66,40 @@ public class MovimentacaoService {
     public List<Movimentacao> listarPorProduto(Long produtoId) {
         return movimentacaoRepository.findByProdutoIdAndEmpresaIdOrderByDataMovimentacaoDesc(
                 produtoId, getEmpresaIdLogada());
+    }
+
+    public ResumoPerdasDTO obterResumoPerdas(int meses) {
+        if (meses < 1 || meses > 24) {
+            throw new RegraNegocioException("O período deve estar entre 1 e 24 meses.");
+        }
+
+        Long empresaId = getEmpresaIdLogada();
+        YearMonth mesAtual = YearMonth.now();
+        YearMonth primeiroMes = mesAtual.minusMonths(meses - 1L);
+        LocalDateTime inicio = primeiroMes.atDay(1).atStartOfDay();
+        LocalDateTime fim = mesAtual.plusMonths(1).atDay(1).atStartOfDay();
+
+        List<Object[]> totaisPorMes = movimentacaoRepository.somarPerdasPorMes(
+                empresaId, inicio, fim);
+
+        java.util.Map<String, BigDecimal> totais = new java.util.HashMap<>();
+        for (Object[] linha : totaisPorMes) {
+            int ano = ((Number) linha[0]).intValue();
+            int mes = ((Number) linha[1]).intValue();
+            BigDecimal valor = linha[2] == null ? BigDecimal.ZERO : (BigDecimal) linha[2];
+            totais.put(YearMonth.of(ano, mes).toString(), valor);
+        }
+
+        java.util.List<PerdasPorMesDTO> porMes = new java.util.ArrayList<>();
+        BigDecimal total = BigDecimal.ZERO;
+        for (int i = 0; i < meses; i++) {
+            YearMonth mes = primeiroMes.plusMonths(i);
+            BigDecimal valor = totais.getOrDefault(mes.toString(), BigDecimal.ZERO);
+            porMes.add(new PerdasPorMesDTO(mes.toString(), valor));
+            total = total.add(valor);
+        }
+
+        return new ResumoPerdasDTO(total, porMes);
     }
 
     @Transactional
