@@ -47,6 +47,10 @@ public interface ProdutoRepository extends JpaRepository<Produto, Long>, JpaSpec
            "AND (p.finalidadeEstoque IS NULL OR p.finalidadeEstoque <> 'USO_INTERNO')")
     List<Produto> findProdutosComEstoqueBaixoPorEmpresa(@Param("empresaId") Long empresaId);
 
+    @Query("SELECT COUNT(p) FROM Produto p WHERE p.empresa.id = :empresaId AND p.quantidade <= p.estoqueMinimo " +
+           "AND (p.finalidadeEstoque IS NULL OR p.finalidadeEstoque <> 'USO_INTERNO')")
+    long countProdutosComEstoqueBaixoPorEmpresa(@Param("empresaId") Long empresaId);
+
     // Traz TODOS os produtos com estoque baixo (Usado pelo Robô do E-mail, que não faz login)
     @Query("SELECT p FROM Produto p WHERE p.quantidade <= p.estoqueMinimo " +
            "AND (p.finalidadeEstoque IS NULL OR p.finalidadeEstoque <> 'USO_INTERNO')")

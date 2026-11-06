@@ -48,9 +48,8 @@ public class DashboardService {
         // 1. Card: Total de Produtos
         dashboard.setTotalProdutos(produtoRepository.countByEmpresaId(empresaId));
 
-        // 2. Card: Estoque Baixo (Reaproveita o método que já tínhamos)
-        int qtdEstoqueBaixo = produtoRepository.findProdutosComEstoqueBaixoPorEmpresa(empresaId).size();
-        dashboard.setEstoqueBaixo(qtdEstoqueBaixo);
+        // 2. Card: Estoque Baixo
+        dashboard.setEstoqueBaixo((int) produtoRepository.countProdutosComEstoqueBaixoPorEmpresa(empresaId));
 
         // 3. Card: Total de Fornecedores
         dashboard.setTotalFornecedores(fornecedorRepository.countByEmpresaId(empresaId));
